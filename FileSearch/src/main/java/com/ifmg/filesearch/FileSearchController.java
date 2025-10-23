@@ -4,6 +4,9 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -21,9 +24,14 @@ public class FileSearchController {
     @FXML private CheckBox checkTxt;
     @FXML private CheckBox checkPng;
     @FXML private ListView<String> listViewResultados;
+    @FXML private TextField textFieldKeyword;
+    @FXML private Button buttonAddKeyword;
+    @FXML private Button buttonRemoveKeyword; // <-- novo botão para remover
+    @FXML private ListView<String> listViewKeywords;
 
     // Mapa para associar o nome do arquivo ao seu caminho completo
     private final Map<String, String> mapaResultados = new HashMap<>();
+    private final ObservableList<String> palavrasChave = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -33,6 +41,64 @@ public class FileSearchController {
                 aoClicarResultado();
             }
         });
+
+        // Inicializa a ListView de palavras-chave e configura o botão/enter
+        if (listViewKeywords != null) {
+            listViewKeywords.setItems(palavrasChave);
+
+            // Context menu para remover palavra-chave
+            ContextMenu ctx = new ContextMenu();
+            MenuItem removerItem = new MenuItem("Remover");
+            removerItem.setOnAction(e -> removerPalavraChave());
+            ctx.getItems().add(removerItem);
+            listViewKeywords.setContextMenu(ctx);
+
+            // Tecla Delete remove a seleção
+            listViewKeywords.setOnKeyPressed(event -> {
+                if (event.getCode() == KeyCode.DELETE) {
+                    removerPalavraChave();
+                }
+            });
+
+            // Duplo clique também remove (opcional)
+            listViewKeywords.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2) {
+                    removerPalavraChave();
+                }
+            });
+        }
+        if (buttonAddKeyword != null) {
+            buttonAddKeyword.setOnAction(e -> adicionarPalavraChave());
+        }
+        if (buttonRemoveKeyword != null) {
+            buttonRemoveKeyword.setOnAction(e -> removerPalavraChave());
+        }
+        if (textFieldKeyword != null) {
+            textFieldKeyword.setOnAction(e -> adicionarPalavraChave()); // permite Enter
+        }
+    }
+
+    @FXML
+    protected void adicionarPalavraChave() {
+        if (textFieldKeyword == null) return; // proteção caso FXML não tenha sido ligado
+        String palavra = textFieldKeyword.getText().trim();
+        if (palavra.isEmpty()) {
+            exibirAlerta("Aviso", "Digite uma palavra-chave antes de adicionar.");
+            return;
+        }
+        if (!palavrasChave.contains(palavra)) {
+            palavrasChave.add(palavra);
+        }
+        textFieldKeyword.clear();
+    }
+
+    // NOVO: método para remover a palavra-chave selecionada
+    @FXML
+    protected void removerPalavraChave() {
+        if (listViewKeywords == null) return;
+        String selecionada = listViewKeywords.getSelectionModel().getSelectedItem();
+        if (selecionada == null) return;
+        palavrasChave.remove(selecionada);
     }
 
     @FXML
@@ -117,10 +183,9 @@ public class FileSearchController {
         ObservableList<String> resultadosEncontrados = FXCollections.observableArrayList();
         for (Map<String, String> doc : resultadosFicticios) {
             String nomeArquivo = doc.get("nome");
-            boolean tipoCorresponde = tiposSelecionados.isEmpty() || tiposSelecionados.stream().anyMatch(nomeArquivo::endsWith);
             boolean descricaoCorresponde = descricao.isEmpty() || nomeArquivo.toLowerCase().contains(descricao.toLowerCase());
 
-            if (tipoCorresponde && descricaoCorresponde) {
+            if (descricaoCorresponde) {
                 resultadosEncontrados.add(nomeArquivo);
                 mapaResultados.put(nomeArquivo, doc.get("caminho"));
             }
