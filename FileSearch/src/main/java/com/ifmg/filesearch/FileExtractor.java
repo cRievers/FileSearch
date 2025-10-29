@@ -1,18 +1,16 @@
 package com.ifmg.filesearch;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
-import java.util.List;
-
-import org.apache.poi.hwpf.HWPFDocument;
-import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
 public class FileExtractor {
-    public static String readFile(String filePath) {
+    public static String extractFile(String filePath) {
         String termination = filePath.substring(filePath.lastIndexOf("."));
         switch(termination){
             case ".txt":
@@ -45,29 +43,19 @@ public class FileExtractor {
     }
 
     private static String readDocx(String filePath, int limit) {
-        // Placeholder for DOCX reading logic
-        try {
-			File file = new File(filePath);
-			FileInputStream fis = new FileInputStream(file.getAbsolutePath());
-
-			XWPFDocument document = new XWPFDocument(fis);
-
-			List<XWPFParagraph> paragraphs = document.getParagraphs();
-			
-			System.out.println("Total no of paragraph "+paragraphs.size());
-			for (XWPFParagraph para : paragraphs) {
-				System.out.println(para.getText());
-			}
-			fis.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-        return "DOCX reading not implemented yet.";
-    }
-
-    public static void main(String[] args) {
-        String content = readFile("C:\\Users\\Caio Rievers Duarte\\OneDrive - Instituto Federal de Minas Gerais\\Documents\\docs pessoais\\Curriculo_Caio_Rievers_Duarte.docx");
-        System.out.println(content);
+        File file = new File(filePath);
+        String result = "";
+        try (FileInputStream fis = new FileInputStream(file)) {
+            XWPFDocument document = new XWPFDocument(fis);
+            for (XWPFParagraph paragraph : document.getParagraphs()) {
+                result += paragraph.getText() + System.lineSeparator();
+                if (result.length() >= limit) break;
+            }
+            document.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
 }

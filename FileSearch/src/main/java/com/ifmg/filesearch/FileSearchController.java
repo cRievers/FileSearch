@@ -8,9 +8,6 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -144,6 +141,17 @@ public class FileSearchController {
                 Map.of("nome", "logo_empresa.png", "caminho", "C:\\Imagens\\logo_empresa.png")
         );
 
+        new FileFinder(descricao, tiposSelecionados, "C:/Users/");
+
+        String[] paths = FileFinder.search();
+        String filesContents[] = new String[paths.length];
+        for (int i = 0; i < paths.length; i++) {
+            filesContents[i] = FileExtractor.extractFile(paths[i]);
+        }
+
+        System.out.println(filesContents[0]);
+
+        /*
         String powershellExecutable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"; // Or the full path if needed
         String pasta = "C:/Users/";
 
@@ -178,6 +186,7 @@ public class FileSearchController {
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+        */
 
         // Filtra os resultados fictícios
         ObservableList<String> resultadosEncontrados = FXCollections.observableArrayList();
@@ -196,50 +205,6 @@ public class FileSearchController {
         } else {
             listViewResultados.setItems(resultadosEncontrados);
         }
-    }
-
-    private String retornarComando(String descricao, List<String>tiposSelecionados, String pasta){
-        String resultado = "Get-ChildItem -Path ";
-        resultado += pasta;
-        resultado += " -Recurse -File -Include ";
-        for (int i=0; i<tiposSelecionados.size()-1; i++) {
-            resultado += "*" + tiposSelecionados.get(i) + ", ";
-        }
-        resultado += "*" + tiposSelecionados.getLast();
-        resultado += " -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime";
-        return resultado;
-    }
-
-    private String retornarPasta(){
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                "powershell.exe",
-                "-Command",
-                "pwd"
-        );
-        String line = "";
-        try {
-            Process process = processBuilder.start();
-
-            // Read the output from the PowerShell command
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
-            }
-
-            // Read any errors
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            while ((line = errorReader.readLine()) != null) {
-                System.err.println("Error: " + line);
-            }
-
-            int exitCode = process.waitFor();
-            System.out.println("PowerShell command exited with code: " + exitCode);
-
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
-        return line;
     }
 
     private void aoClicarResultado() {

@@ -7,25 +7,27 @@ import java.util.List;
 
 public class FileFinder {
 
-    private String descricao;
-    private List<String> tiposSelecionados;
-    private String pasta;
+    private static String descricao;
+    private static List<String> tiposSelecionados;
+    private static String pasta;
 
     public FileFinder(String descricao, List<String> tiposSelecionados, String pasta){
-        this.descricao = descricao;
-        this.tiposSelecionados = tiposSelecionados;
-        this.pasta = pasta;
+        FileFinder.descricao = descricao;
+        FileFinder.tiposSelecionados = tiposSelecionados;
+        FileFinder.pasta = pasta;
     }
 
-    public void buscar(){
+    public static String[] search(){
         String powershellExecutable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
-        String powershellCommand = retornarComando(descricao, tiposSelecionados, pasta); // Your PowerShell command
+        String powershellCommand = buildCommand(descricao, tiposSelecionados, pasta); // Your PowerShell command
 
         ProcessBuilder processBuilder = new ProcessBuilder(
             powershellExecutable,
             "-Command",
             powershellCommand
         );
+
+        String files = "";
 
         try
         {
@@ -35,7 +37,7 @@ public class FileFinder {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println(line); // avaliar cada arquivo aqui
+                files += line + "\n";
             }
             // Read any errors
             BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
@@ -51,9 +53,11 @@ public class FileFinder {
         {
             e.printStackTrace();
         }
+        System.out.println(files);
+        return files.split("\n");
     }
 
-    String retornarComando(String descricao, List<String>tiposSelecionados, String pasta){
+    private static String buildCommand(String descricao, List<String>tiposSelecionados, String pasta){
         String resultado = "Get-ChildItem -Path ";
         resultado += pasta;
         resultado += " -Recurse -File -Include ";
@@ -61,11 +65,11 @@ public class FileFinder {
             resultado += "*" + tiposSelecionados.get(i) + ", ";
         }
         resultado += "*" + tiposSelecionados.getLast();
-        resultado += " -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime";
+        resultado += " -ErrorAction SilentlyContinue | Select-Object FullName";
         return resultado;
     }
 
-    private String retornarPasta(){
+    private String currentFolder(){
         ProcessBuilder processBuilder = new ProcessBuilder(
                 "powershell.exe",
                 "-Command",
