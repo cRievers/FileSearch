@@ -7,11 +7,13 @@ import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 public class FileExtractor {
     public static String extractFile(String filePath) {
         if (filePath == null || filePath.isEmpty()) return null;
+
         int lastDot = filePath.lastIndexOf('.');
         if (lastDot < 0 || lastDot == filePath.length() - 1) {
             // no extension or ends with a dot
@@ -41,6 +43,9 @@ public class FileExtractor {
             }
             String everything = sb.toString();
             return everything;
+        }
+        catch (FileNotFoundException e) {
+            System.out.println("ERROR: arquivo não encontrado: " + filePath);
         }
         catch (Exception e){
             e.printStackTrace();
