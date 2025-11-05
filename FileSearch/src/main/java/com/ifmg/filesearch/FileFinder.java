@@ -100,14 +100,7 @@ public class FileFinder {
             resultado.append(")");
         }
         
-        // Add content search if description is provided
-        if (descricao != null && !descricao.trim().isEmpty()) {
-            resultado.append(" | Select-String -Pattern '")
-                    .append(descricao.replace("'", "''")) // Escape single quotes
-                    .append("' -List | Select-Object -ExpandProperty Path");
-        } else {
-            resultado.append(" | Select-Object -ExpandProperty FullName");
-        }
+        resultado.append(" | Select-Object -ExpandProperty FullName");
         
         resultado.append(" -ErrorAction SilentlyContinue");
         return resultado.toString();
