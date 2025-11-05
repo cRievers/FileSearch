@@ -20,13 +20,14 @@ public class FileExtractor {
             return "Unsupported file type";
         }
         String termination = filePath.substring(lastDot).toLowerCase();
+        System.out.println("Extracting file with termination: " + termination); // Debug line
         switch (termination) {
             case ".txt":
                 return readTxt(filePath, 7000);
             case ".docx":
                 return readDocx(filePath, 7000);
             default:
-                return ("Unsupported file type");
+                return ("Not implemented yet");
         }
     }
 
@@ -64,9 +65,16 @@ public class FileExtractor {
             }
             document.close();
         } catch (IOException e) {
+            System.out.println("ERROR: falha ao ler arquivo: " + filePath);
             e.printStackTrace();
         }
         return result;
+    }
+
+    public static void main(String[] args) {
+        String filePath = "C:\\Users\\Caio Rievers Duarte\\OneDrive - Instituto Federal de Minas Gerais\\Trabalho Arquitetura MVC PWEB.docx";
+        String content = extractFile(filePath);
+        System.out.println("Conteúdo extraído:\n" + content);
     }
 
 }

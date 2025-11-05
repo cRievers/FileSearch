@@ -39,6 +39,11 @@ public class FileFinder {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
+                        int lastDot = line.lastIndexOf('.');
+                        if (lastDot < 0 || lastDot == line.length() - 1) {
+                            // no extension or ends with a dot
+                            continue;
+                        }
                         if (!line.trim().isEmpty()) {
                             System.out.println("Found file: " + line); // Debug line
 
@@ -80,6 +85,7 @@ public class FileFinder {
             e.printStackTrace();
         }
 
+        System.out.println("Total files found: " + filesPaths.size()); // Debug line
         return filesPaths.toArray(new String[0]);
     }
 
@@ -92,15 +98,14 @@ public class FileFinder {
         
         // Handle file types
         if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
-            resultado.append(" -Include @(");
+            resultado.append(" -Include ");
             for (int i = 0; i < tiposSelecionados.size(); i++) {
                 if (i > 0) resultado.append(",");
-                resultado.append("'*").append(tiposSelecionados.get(i)).append("'");
+                resultado.append("*").append(tiposSelecionados.get(i));
             }
-            resultado.append(")");
         }
         
-        resultado.append(" | Select-Object -ExpandProperty FullName");
+        resultado.append(" -ErrorAction SilentlyContinue | Select-Object FullName");
         
         resultado.append(" -ErrorAction SilentlyContinue");
         return resultado.toString();

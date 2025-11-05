@@ -149,12 +149,18 @@ public class FileSearchController {
             filesContents[i] = FileExtractor.extractFile(paths[i]);
         }
 
+        System.out.println("tamanho de path: " + paths.length);
+
         if (paths.length == 0) {
             System.out.println("INFO: realizarBusca(): nenhum arquivo encontrado.");
         }
 
-        // System.out.println(filesContents[0]);
+        if(filesContents.length > 0) 
+        {
+            System.out.println("caminho do primeiro: " + paths[0]);
+            System.out.println("Conteúdo do primeiro: \n" + filesContents[0]);
 
+        }
         /*
         String powershellExecutable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"; // Or the full path if needed
         String pasta = "C:/Users/";
