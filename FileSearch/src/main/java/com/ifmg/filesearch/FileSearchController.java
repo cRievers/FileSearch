@@ -141,7 +141,7 @@ public class FileSearchController {
                 Map.of("nome", "logo_empresa.png", "caminho", "C:\\Imagens\\logo_empresa.png")
         );
 
-        new FileFinder(descricao, tiposSelecionados, "C:/Users/");
+        new FileFinder(descricao, tiposSelecionados, "'C:/Users/'");
 
         String[] paths = FileFinder.search();
         String filesContents[] = new String[paths.length];
