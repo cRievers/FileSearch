@@ -6,8 +6,10 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Tooltip?>
 
 <VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.ifmg.filesearch.FileSearchController" spacing="10.0" alignment="TOP_LEFT">
     <padding>
@@ -24,6 +26,26 @@
         <CheckBox fx:id="checkTxt" text=".txt"/>
         <CheckBox fx:id="checkPng" text=".png"/>
     </HBox>
+
+    <Label text="Palavras-chave:" style="-fx-font-weight: bold;"/>
+    <HBox spacing="10.0">
+        <children>
+            <TextField fx:id="textFieldKeyword" promptText="Digite uma palavra-chave">
+                <HBox.hgrow>ALWAYS</HBox.hgrow>
+            </TextField>
+            <Button fx:id="buttonAddKeyword" text="+" style="-fx-font-weight: bold;">
+                <tooltip>
+                    <Tooltip text="Adicionar palavra-chave"/>
+                </tooltip>
+            </Button>
+            <Button fx:id="buttonRemoveKeyword" text="-" style="-fx-font-weight: bold;">
+                <tooltip>
+                    <Tooltip text="Remover palavra-chave selecionada"/>
+                </tooltip>
+            </Button>
+        </children>
+    </HBox>
+    <ListView fx:id="listViewKeywords" prefHeight="100.0" VBox.vgrow="NEVER"/>
 
     <Button fx:id="btnBuscar" text="Buscar" onAction="#realizarBusca" maxWidth="1.7976931348623157E308" style="-fx-font-weight: bold; -fx-background-color: #4a90e2; -fx-text-fill: white;"/>
 

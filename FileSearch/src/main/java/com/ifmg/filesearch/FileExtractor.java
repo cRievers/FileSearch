@@ -11,8 +11,14 @@ import java.io.IOException;
 
 public class FileExtractor {
     public static String extractFile(String filePath) {
-        String termination = filePath.substring(filePath.lastIndexOf("."));
-        switch(termination){
+        if (filePath == null || filePath.isEmpty()) return null;
+        int lastDot = filePath.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == filePath.length() - 1) {
+            // no extension or ends with a dot
+            return "Unsupported file type";
+        }
+        String termination = filePath.substring(lastDot).toLowerCase();
+        switch (termination) {
             case ".txt":
                 return readTxt(filePath, 7000);
             case ".docx":

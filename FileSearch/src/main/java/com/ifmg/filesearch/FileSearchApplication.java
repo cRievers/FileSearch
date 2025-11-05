@@ -11,7 +11,7 @@ public class FileSearchApplication extends Application {
     @Override
     public void start(Stage stage) throws Exception {
         Parent root = FXMLLoader.load(getClass().getResource("FileSearch.fxml"));
-        Scene scene = new Scene(root, 700, 550);
+        Scene scene = new Scene(root, 700, 800);
         stage.setTitle("Busca de Documentos Locais");
         stage.setScene(scene);
         stage.show();

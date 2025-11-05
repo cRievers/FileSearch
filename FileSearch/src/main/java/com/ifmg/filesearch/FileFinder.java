@@ -27,23 +27,44 @@ public class FileFinder {
             powershellCommand
         );
 
-        String files = "";
+        StringBuilder filesBuilder = new StringBuilder();
+        System.out.println("Executing command: " + powershellCommand); // Debug line
 
-        try
-        {
-            Process process = processBuilder.inheritIO().start();
+        try {
+            Process process = processBuilder.start();
 
-            // Read the output from the PowerShell command
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                files += line + "\n";
-            }
+            // Read the output from the PowerShell command in a separate thread to prevent deadlock
+            Thread outputThread = new Thread(() -> {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (!line.trim().isEmpty()) {
+                            System.out.println("Found file: " + line); // Debug line
+                            filesBuilder.append(line.trim()).append('\n');
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            outputThread.start();
+
             // Read any errors
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            while ((line = errorReader.readLine()) != null) {
-                System.err.println("Error: " + line);
-            }
+            Thread errorThread = new Thread(() -> {
+                try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                    String line;
+                    while ((line = errorReader.readLine()) != null) {
+                        System.err.println("Error: " + line);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            errorThread.start();
+
+            // Wait for both threads to complete
+            outputThread.join();
+            errorThread.join();
 
             int exitCode = process.waitFor();
             System.out.println("PowerShell command exited with code: " + exitCode);
@@ -53,20 +74,48 @@ public class FileFinder {
         {
             e.printStackTrace();
         }
+        String files = filesBuilder.toString();
         System.out.println(files);
-        return files.split("\n");
+        if (files.trim().isEmpty()) {
+            return new String[0];
+        }
+        String[] raw = files.split("\\R");
+        // filter out any empty entries
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String s : raw) {
+            if (s != null && !s.trim().isEmpty()) list.add(s.trim());
+        }
+        return list.toArray(new String[0]);
     }
 
-    private static String buildCommand(String descricao, List<String>tiposSelecionados, String pasta){
-        String resultado = "Get-ChildItem -Path ";
-        resultado += pasta;
-        resultado += " -Recurse -File -Include ";
-        for (int i=0; i<tiposSelecionados.size()-1; i++) {
-            resultado += "*" + tiposSelecionados.get(i) + ", ";
+    private static String buildCommand(String descricao, List<String> tiposSelecionados, String pasta){
+        StringBuilder resultado = new StringBuilder();
+        resultado.append("Get-ChildItem -Path ");
+        // Quote the path in case it contains spaces
+        resultado.append('"').append(pasta).append('"');
+        resultado.append(" -Recurse -File");
+        
+        // Handle file types
+        if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
+            resultado.append(" -Include @(");
+            for (int i = 0; i < tiposSelecionados.size(); i++) {
+                if (i > 0) resultado.append(",");
+                resultado.append("'*").append(tiposSelecionados.get(i)).append("'");
+            }
+            resultado.append(")");
         }
-        resultado += "*" + tiposSelecionados.getLast();
-        resultado += " -ErrorAction SilentlyContinue | Select-Object FullName";
-        return resultado;
+        
+        // Add content search if description is provided
+        if (descricao != null && !descricao.trim().isEmpty()) {
+            resultado.append(" | Select-String -Pattern '")
+                    .append(descricao.replace("'", "''")) // Escape single quotes
+                    .append("' -List | Select-Object -ExpandProperty Path");
+        } else {
+            resultado.append(" | Select-Object -ExpandProperty FullName");
+        }
+        
+        resultado.append(" -ErrorAction SilentlyContinue");
+        return resultado.toString();
     }
 
     private String currentFolder(){
