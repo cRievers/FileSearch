@@ -3,6 +3,7 @@ package com.ifmg.filesearch;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 
 public class FileFinder {
@@ -27,7 +28,7 @@ public class FileFinder {
             powershellCommand
         );
 
-        StringBuilder filesBuilder = new StringBuilder();
+        List<String> filesPaths = new ArrayList<>();
         System.out.println("Executing command: " + powershellCommand); // Debug line
 
         try {
@@ -40,7 +41,11 @@ public class FileFinder {
                     while ((line = reader.readLine()) != null) {
                         if (!line.trim().isEmpty()) {
                             System.out.println("Found file: " + line); // Debug line
-                            filesBuilder.append(line.trim()).append('\n');
+
+                            StringBuilder lineToAdd = new StringBuilder("'");
+                            lineToAdd.append(line);
+                            lineToAdd.append("'");
+                            filesPaths.add(lineToAdd.toString());
                         }
                     }
                 } catch (IOException e) {
@@ -74,18 +79,8 @@ public class FileFinder {
         {
             e.printStackTrace();
         }
-        String files = filesBuilder.toString();
-        System.out.println(files);
-        if (files.trim().isEmpty()) {
-            return new String[0];
-        }
-        String[] raw = files.split("\\R");
-        // filter out any empty entries
-        java.util.List<String> list = new java.util.ArrayList<>();
-        for (String s : raw) {
-            if (s != null && !s.trim().isEmpty()) list.add(s.trim());
-        }
-        return list.toArray(new String[0]);
+
+        return filesPaths.toArray(new String[0]);
     }
 
     private static String buildCommand(String descricao, List<String> tiposSelecionados, String pasta){
