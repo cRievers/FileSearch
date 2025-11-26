@@ -153,44 +153,12 @@ public class FileSearchController {
             System.out.println("INFO: realizarBusca(): nenhum arquivo encontrado.");
         }
 
-        // System.out.println(filesContents[0]);
+        //pega os indices dos arquivos que contém todas as palavras-chave
+        List<Integer> matchedIndexes = filterFilesbyKeyWords(filesContents, palavrasChave);
+        //caso fique devagar, ranquear por quantidade de palavras-chave encontradas
 
-        /*
-        String powershellExecutable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"; // Or the full path if needed
-        String pasta = "C:/Users/";
-
-
-        String powershellCommand = retornarComando(descricao, tiposSelecionados, pasta); // Your PowerShell command
-
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                powershellExecutable,
-                "-Command",
-                powershellCommand
-        );
-
-        try {
-            Process process = processBuilder.inheritIO().start();
-
-            // Read the output from the PowerShell command
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line); //avaliar cada arquivo aqui
-            }
-
-            // Read any errors
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            while ((line = errorReader.readLine()) != null) {
-                System.err.println("Error: " + line);
-            }
-
-            int exitCode = process.waitFor();
-            System.out.println("PowerShell command exited with code: " + exitCode);
-
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
-        */
+        //enviar para IA
+        
 
         // Filtra os resultados fictícios
         ObservableList<String> resultadosEncontrados = FXCollections.observableArrayList();
@@ -227,5 +195,24 @@ public class FileSearchController {
         alert.setHeaderText(null);
         alert.setContentText(mensagem);
         alert.showAndWait();
+    }
+
+    //Filtra os arquivos lidos por TODAS as palavras-chave
+    private List<Integer> filterFilesbyKeyWords(String[] contents, List<String> keywords) {
+        List<Integer> matchedIndexes = new ArrayList<>();
+        for (int i = 0; i < contents.length; i++) {
+            String content = contents[i].toLowerCase();
+            boolean allMatch = true;
+            for (String keyword : keywords) {
+                if (!content.contains(keyword.toLowerCase())) {
+                    allMatch = false;
+                    break;
+                }
+            }
+            if (allMatch) {
+                matchedIndexes.add(i);
+            }
+        }
+        return matchedIndexes;
     }
 }
