@@ -155,7 +155,7 @@ public class FileSearchController {
         List<String> keywordsCopy = new ArrayList<>(palavrasChave);
 
         // Validação básica
-        if (descricao.isEmpty() && tiposSelecionados.isEmpty()) {
+        if (descricao.isEmpty() || tiposSelecionados.isEmpty()) {
             exibirAlerta("Aviso", "Por favor, digite uma descrição ou selecione um tipo de arquivo.");
             return;
         }

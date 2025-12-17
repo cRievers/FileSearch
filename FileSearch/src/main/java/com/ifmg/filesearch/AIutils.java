@@ -40,6 +40,7 @@ public class AIutils {
         // Constrói o DTO que será serializado: {"model": "...", "prompt": "...",
         // "stream": false}
         OllamaRequest ollamaRequest = new OllamaRequest(model, prompt);
+            ollamaRequest.setContextSize(16384); // Ajuste conforme necessário
 
         try {
             // 1. Serializa o objeto Java para o JSON exigido pelo Ollama
@@ -100,7 +101,7 @@ public class AIutils {
 
     public static void main(String[] args) {
         AIutils aiutils = new AIutils();
-        String prompt = "Quais são os princípios SOLID em programação orientada a objetos?";
+        String prompt = "Quais são as cores RGB?";
         String resposta = aiutils.generate(prompt);
         System.out.println("Resposta da IA: " + resposta);
     }
