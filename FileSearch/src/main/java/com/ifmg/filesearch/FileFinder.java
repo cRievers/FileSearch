@@ -40,11 +40,10 @@ public class FileFinder {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         if (!line.trim().isEmpty()) {
-                            System.out.println("Found file: " + line); // Debug line
-
-                            StringBuilder lineToAdd = new StringBuilder("'");
+                            //System.out.println("Found file: " + line); // Debug line
+                            StringBuilder lineToAdd = new StringBuilder("");
                             lineToAdd.append(line);
-                            lineToAdd.append("'");
+                            lineToAdd.append("");
                             filesPaths.add(lineToAdd.toString());
                         }
                     }

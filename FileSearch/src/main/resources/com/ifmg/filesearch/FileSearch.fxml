@@ -47,8 +47,17 @@
     </HBox>
     <ListView fx:id="listViewKeywords" prefHeight="100.0" VBox.vgrow="NEVER"/>
 
-    <Button fx:id="btnBuscar" text="Buscar" onAction="#realizarBusca" maxWidth="1.7976931348623157E308" style="-fx-font-weight: bold; -fx-background-color: #4a90e2; -fx-text-fill: white;"/>
-
+    <HBox spacing="10.0">
+        <children>
+            <Button fx:id="btnBuscar" text="Buscar" onAction="#realizarBusca" 
+                    maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS" 
+                    style="-fx-font-weight: bold; -fx-background-color: #4a90e2; -fx-text-fill: white;"/>
+            
+            <Button fx:id="btnParar" text="Parar" onAction="#pararBusca" disable="true"
+                    style="-fx-font-weight: bold; -fx-background-color: #d9534f; -fx-text-fill: white;"/>
+        </children>
+    </HBox>
+    
     <Label text="Resultados:" style="-fx-font-weight: bold;"/>
     <ListView fx:id="listViewResultados" VBox.vgrow="ALWAYS"/>
 </VBox>

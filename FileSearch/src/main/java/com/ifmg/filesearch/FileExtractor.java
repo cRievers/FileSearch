@@ -17,7 +17,7 @@ public class FileExtractor {
         int lastDot = filePath.lastIndexOf('.');
         if (lastDot < 0 || lastDot == filePath.length() - 1) {
             // no extension or ends with a dot
-            return "Unsupported file type";
+            return "This is not a valid file type";
         }
         String termination = filePath.substring(lastDot).toLowerCase();
         switch (termination) {
@@ -67,6 +67,13 @@ public class FileExtractor {
             e.printStackTrace();
         }
         return result;
+    }
+
+    public static void main(String[] args) {
+        String filePath = "C:\\Users\\Caio Rievers Duarte\\OneDrive - Instituto Federal de Minas Gerais\\Trabalho_I_Mat_Discr.docx";
+        String content = extractFile(filePath);
+        System.out.println("Conteúdo extraído do arquivo:");
+        System.out.println(content);
     }
 
 }
