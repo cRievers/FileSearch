@@ -13,12 +13,11 @@ public class OllamaRequest {
     public OllamaRequest(String model, String prompt) {
         this.model = model;
         this.prompt = prompt;
-        this.stream = false; // Requisição síncrona simples
+        this.stream = false;
         this.options = new HashMap<>();
     }
 
     public void setContextSize(int contextSize) {
         this.options.put("num_ctx", contextSize);
     }
-
 }

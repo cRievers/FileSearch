@@ -88,6 +88,7 @@ public class FileFinder {
         // Quote the path in case it contains spaces
         resultado.append('"').append(pasta).append('"');
         resultado.append(" -Recurse -File");
+        resultado.append(" -Exclude '.*'");
         
         // Handle file types
         if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
@@ -98,6 +99,12 @@ public class FileFinder {
             }
             resultado.append(")");
         }
+
+        //Where-Object para garantir a exclusão de pastas ocultas/dot-folders
+        // A Regex verifica se existe uma barra seguida de ponto no caminho completo (ex: \.git\)
+        // [\\/] corresponde a barra normal ou invertida
+        // \. corresponde ao ponto literal
+        resultado.append(" | Where-Object { $_.FullName -notmatch '[\\\\/]\\.' }");
         
         resultado.append(" | Select-Object -ExpandProperty FullName");
         

@@ -5,7 +5,10 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.application.Platform;
 import java.util.LinkedHashMap;
 
@@ -41,6 +44,12 @@ public class FileSearchController {
     private Button btnBuscar;
     @FXML
     private Button btnParar;
+    @FXML
+    private CheckBox checkXlsx; // Adicionar no FXML
+    @FXML
+    private CheckBox checkPptx;
+    @FXML
+    private TextField textFieldPastaBase;
 
     // Variável para controlar a tarefa atual e permitir o cancelamento
     private Task<LinkedHashMap<String, String>> tarefaBuscaAtual;
@@ -61,6 +70,9 @@ public class FileSearchController {
         // Inicializa a ListView de palavras-chave e configura o botão/enter
         if (listViewKeywords != null) {
             listViewKeywords.setItems(palavrasChave);
+
+            // Valor padrão para a pasta base
+            textFieldPastaBase.setText("C:/Users/");
 
             // Context menu para remover palavra-chave
             ContextMenu ctx = new ContextMenu();
@@ -94,6 +106,32 @@ public class FileSearchController {
         }
         if (btnParar != null) {
             btnParar.setDisable(true);
+        }
+    }
+
+    @FXML
+    protected void selecionarPastaBase(ActionEvent event) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Selecione a pasta base para a busca");
+        
+        // Tenta iniciar na pasta que já está escrita ou na home do usuário
+        String caminhoAtual = textFieldPastaBase.getText();
+        if (caminhoAtual != null && !caminhoAtual.isEmpty()) {
+            File f = new File(caminhoAtual);
+            if (f.exists() && f.isDirectory()) {
+                directoryChooser.setInitialDirectory(f);
+            }
+        } else {
+            directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+        }
+
+        // Obtém a janela atual para abrir o diálogo modal
+        Stage stage = (Stage) ((javafx.scene.Node) event.getSource()).getScene().getWindow();
+        File selectedDirectory = directoryChooser.showDialog(stage);
+
+        if (selectedDirectory != null) {
+            // Atualiza o campo de texto com o caminho absoluto (trocando barras invertidas se necessário)
+            textFieldPastaBase.setText(selectedDirectory.getAbsolutePath().replace("\\", "/"));
         }
     }
 
@@ -134,12 +172,13 @@ public class FileSearchController {
 
     @FXML
     protected void realizarBusca() {
-        // 1. Limpa os resultados anteriores (Operação de UI)
+        // 1. Limpa os resultados anteriores
         listViewResultados.getItems().clear();
         mapaResultados.clear();
 
-        // 2. Coleta dados da UI (Deve ser feito na Thread principal)
+        // 2. Coleta dados da UI
         String descricao = textAreaDescricao.getText().trim();
+        String pastaBaseRaw = textFieldPastaBase.getText().trim();
 
         List<String> tiposSelecionados = new ArrayList<>();
         if (checkPdf.isSelected())
@@ -150,15 +189,23 @@ public class FileSearchController {
             tiposSelecionados.add(".txt");
         if (checkPng.isSelected())
             tiposSelecionados.add(".png");
-
-        // Cria uma cópia das palavras-chave para passar para a thread (thread-safety)
-        List<String> keywordsCopy = new ArrayList<>(palavrasChave);
+            tiposSelecionados.add(".jpg");
+            tiposSelecionados.add(".jpeg");
+        if (checkXlsx.isSelected())
+            tiposSelecionados.add(".xlsx");
+        if (checkPptx.isSelected())
+            tiposSelecionados.add(".pptx");
 
         // Validação básica
-        if (descricao.isEmpty() || tiposSelecionados.isEmpty()) {
+        if (descricao.isEmpty() && tiposSelecionados.isEmpty()) {
             exibirAlerta("Aviso", "Por favor, digite uma descrição ou selecione um tipo de arquivo.");
             return;
         }
+
+        if (pastaBaseRaw.isEmpty()) {
+            pastaBaseRaw = "C:/Users/";
+        }
+        final String pastaBaseFinal = pastaBaseRaw; // Variável final para usar na Task
 
         System.out.println("--- Iniciando Busca em Segundo Plano ---");
         System.out.println("Descrição: " + descricao);
@@ -168,80 +215,105 @@ public class FileSearchController {
             btnBuscar.setDisable(true);
         if (btnParar != null)
             btnParar.setDisable(false);
-        listViewResultados.getItems().add("Buscando...");
-
-        // Opcional: Mostrar um indicador de carregamento na ListView
-        listViewResultados.getItems().add("Buscando... aguarde...");
+        listViewResultados.getItems().add("Buscando em: " + pastaBaseFinal);
 
         // 4. Criação da Task
         tarefaBuscaAtual = new Task<>() {
             @Override
             protected LinkedHashMap<String, String> call() throws Exception {
-                // VERIFICAÇÃO DE CANCELAMENTO
                 if (isCancelled())
                     return null;
 
-                // --- Busca de Arquivos ---
-                new FileFinder(descricao, tiposSelecionados, "'C:/Users/'");
-                // Se a thread for interrompida aqui, o FileFinder captura a exceção e retorna o
-                // que achou
+                // --- Passo A: Busca de Arquivos no Sistema (PowerShell) ---
+                updateMessage("Listando arquivos...");
+                // Nota: Ajuste o caminho 'C:/Users/...' conforme sua necessidade ou pegue de um
+                // input
+                new FileFinder(descricao, tiposSelecionados, pastaBaseFinal);
                 String[] paths = FileFinder.search();
 
-                if (isCancelled())
-                    return null; // Verifica se cancelou após a busca
+                if (paths == null || paths.length == 0) {
+                    return new LinkedHashMap<>();
+                }
 
-                // --- Extração de Conteúdo ---
-                String[] filesContents = new String[paths.length];
-                for (int i = 0; i < paths.length; i++) {
+                if (isCancelled())
+                    return null;
+
+                // --- Passo B: Extração de Texto ---
+                updateMessage("Lendo conteúdo (" + paths.length + " arquivos)...");
+
+                List<String> conteudos = new ArrayList<>();
+                List<String> nomesArquivos = new ArrayList<>();
+                Map<String, String> mapNomeParaPath = new HashMap<>();
+
+                for (String path : paths) {
                     if (isCancelled())
-                        return null; // Verifica a cada iteração
-                    filesContents[i] = FileExtractor.extractFile(paths[i]);
-                }
+                        return null;
 
-                // --- Filtragem ---
-                List<Integer> matchedIndexes = filterFilesbyKeyWords(filesContents, keywordsCopy);
+                    File f = new File(path);
+                    // Otimização: Se o arquivo for muito grande, talvez pular ou ler parcial no
+                    // FileExtractor
+                    String texto = FileExtractor.extractFile(path);
 
-                // --- IA ---
-                if (isCancelled())
-                    return null;
-                updateMessage("Consultando IA..."); // Opcional: feedback visual
-
-                AIutils aiutils = new AIutils();
-                String prompt = aiutils.generatePrompt(matchedIndexes, filesContents, descricao);
-
-                if (isCancelled())
-                    return null;
-                String resposta = aiutils.generate(prompt);
-
-                // --- Processamento da Resposta ---
-                if (isCancelled())
-                    return null;
-
-                // (Lógica de processamento dos índices igual à anterior...)
-                int[] rankedIndexes;
-                if (resposta == null || resposta.trim().equals("-1")) {
-                    rankedIndexes = new int[0];
-                } else {
-                    String[] partes = resposta.split(",");
-                    List<Integer> validIndexes = new ArrayList<>();
-                    for (String parte : partes) {
-                        try {
-                            int idx = Integer.parseInt(parte.trim());
-                            if (idx >= 0 && idx < paths.length)
-                                validIndexes.add(idx);
-                        } catch (NumberFormatException e) {
-                            /* ignorar */ }
+                    if (texto != null && !texto.startsWith("Unsupported") && !texto.startsWith("This is not")) {
+                        conteudos.add(texto);
+                        nomesArquivos.add(f.getName());
+                        mapNomeParaPath.put(f.getName(), path);
                     }
-                    rankedIndexes = validIndexes.stream().mapToInt(i -> i).toArray();
                 }
 
-                LinkedHashMap<String, String> resultadosProcessados = new LinkedHashMap<>();
-                for (int i : rankedIndexes) {
-                    File arquivo = new File(paths[i]);
-                    resultadosProcessados.put(arquivo.getName(), paths[i]);
+                if (conteudos.isEmpty())
+                    return new LinkedHashMap<>();
+
+                // --- Passo C: Filtro Híbrido (Lucene + IA em Lotes) ---
+
+                // 1. Configura e Indexa no Lucene
+                updateMessage("Criando índice de busca...");
+                Filter filtroService = new Filter();
+                filtroService.indexarArquivos(nomesArquivos, conteudos);
+
+                if (isCancelled())
+                    return null;
+
+                // 2. Busca Preliminar (Lucene) - Reduz de N arquivos para Top 20 (por exemplo)
+                updateMessage("Filtrando por palavras-chave...");
+                // Converte ObservableList para List normal
+                List<String> listaKeywords = new ArrayList<>(palavrasChave);
+
+                // Busca até 20 candidatos que contenham as palavras-chave ou termos da
+                // descrição
+                List<Filter.DocumentoCandidato> candidatos = filtroService.buscarNoLucene(descricao, listaKeywords, 20);
+
+                System.out.println("Lucene encontrou " + candidatos.size() + " candidatos.");
+
+                if (candidatos.isEmpty()) {
+                    return new LinkedHashMap<>();
                 }
 
-                return resultadosProcessados;
+                // 3. Refinamento Semântico (Ollama em Lotes)
+                updateMessage("Analisando contexto com IA (em lotes)...");
+                List<String> nomesAprovados;
+
+                // Se o usuário não digitou descrição, só keywords, confiamos no Lucene
+                // Se tem descrição semântica ("quero o arquivo que fala sobre..."), usamos o
+                // Ollama
+                if (!descricao.trim().isEmpty()) {
+                    nomesAprovados = filtroService.filtrarComOllamaEmLotes(descricao, candidatos);
+                } else {
+                    // Se só tem keywords, o Lucene já fez o trabalho exato
+                    nomesAprovados = new ArrayList<>();
+                    for (Filter.DocumentoCandidato d : candidatos)
+                        nomesAprovados.add(d.filename);
+                }
+
+                // --- Passo D: Montar Resultado Final ---
+                LinkedHashMap<String, String> resultadoFinal = new LinkedHashMap<>();
+                for (String nome : nomesAprovados) {
+                    if (mapNomeParaPath.containsKey(nome)) {
+                        resultadoFinal.put(nome, mapNomeParaPath.get(nome));
+                    }
+                }
+
+                return resultadoFinal;
             }
         };
 
@@ -256,7 +328,7 @@ public class FileSearchController {
             } else {
                 mapaResultados.putAll(resultados);
                 listViewResultados.getItems().addAll(resultados.keySet());
-                exibirAlerta("Pronto!", "Busca concluída.");
+                exibirAlerta("Pronto!", "Busca concluída. Encontrados: " + resultados.size());
             }
             resetaBotoes();
         });
