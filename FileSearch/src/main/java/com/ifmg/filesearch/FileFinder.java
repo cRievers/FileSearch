@@ -12,21 +12,20 @@ public class FileFinder {
     private static List<String> tiposSelecionados;
     private static String pasta;
 
-    public FileFinder(String descricao, List<String> tiposSelecionados, String pasta){
+    public FileFinder(String descricao, List<String> tiposSelecionados, String pasta) {
         FileFinder.descricao = descricao;
         FileFinder.tiposSelecionados = tiposSelecionados;
         FileFinder.pasta = pasta;
     }
 
-    public static String[] search(){
+    public static String[] search() {
         String powershellExecutable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
         String powershellCommand = buildCommand(descricao, tiposSelecionados, pasta); // Your PowerShell command
 
         ProcessBuilder processBuilder = new ProcessBuilder(
-            powershellExecutable,
-            "-Command",
-            powershellCommand
-        );
+                powershellExecutable,
+                "-Command",
+                powershellCommand);
 
         List<String> filesPaths = new ArrayList<>();
         System.out.println("Executing command: " + powershellCommand); // Debug line
@@ -34,13 +33,14 @@ public class FileFinder {
         try {
             Process process = processBuilder.start();
 
-            // Read the output from the PowerShell command in a separate thread to prevent deadlock
+            // Read the output from the PowerShell command in a separate thread to prevent
+            // deadlock
             Thread outputThread = new Thread(() -> {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         if (!line.trim().isEmpty()) {
-                            //System.out.println("Found file: " + line); // Debug line
+                            // System.out.println("Found file: " + line); // Debug line
                             StringBuilder lineToAdd = new StringBuilder("");
                             lineToAdd.append(line);
                             lineToAdd.append("");
@@ -73,51 +73,51 @@ public class FileFinder {
             int exitCode = process.waitFor();
             System.out.println("PowerShell command exited with code: " + exitCode);
 
-        }catch(IOException|
-        InterruptedException e)
-        {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
         return filesPaths.toArray(new String[0]);
     }
 
-    private static String buildCommand(String descricao, List<String> tiposSelecionados, String pasta){
+    private static String buildCommand(String descricao, List<String> tiposSelecionados, String pasta) {
         StringBuilder resultado = new StringBuilder();
         resultado.append("Get-ChildItem -Path ");
-        // Quote the path in case it contains spaces
-        resultado.append('"').append(pasta).append('"');
+
+        // CORREÇÃO: Usar aspas simples para o caminho e escapar aspas existentes
+        // O PowerShell usa duas aspas simples ('') para representar uma literal
+        String pastaSegura = pasta.replace("'", "''");
+        resultado.append("'").append(pastaSegura).append("'");
+
         resultado.append(" -Recurse -File");
-        resultado.append(" -Exclude '.*'");
-        
+        resultado.append(" -Exclude '.*'"); // Ignora ficheiros que começam por ponto (config)
+
         // Handle file types
         if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
             resultado.append(" -Include @(");
             for (int i = 0; i < tiposSelecionados.size(); i++) {
-                if (i > 0) resultado.append(",");
+                if (i > 0)
+                    resultado.append(",");
+                // Mantém aspas simples aqui também, pois já estava correto
                 resultado.append("'*").append(tiposSelecionados.get(i)).append("'");
             }
             resultado.append(")");
         }
 
-        //Where-Object para garantir a exclusão de pastas ocultas/dot-folders
-        // A Regex verifica se existe uma barra seguida de ponto no caminho completo (ex: \.git\)
-        // [\\/] corresponde a barra normal ou invertida
-        // \. corresponde ao ponto literal
+        // Where-Object para garantir a exclusão de pastas ocultas/dot-folders
         resultado.append(" | Where-Object { $_.FullName -notmatch '[\\\\/]\\.' }");
-        
+
         resultado.append(" | Select-Object -ExpandProperty FullName");
-        
+
         resultado.append(" -ErrorAction SilentlyContinue");
         return resultado.toString();
     }
 
-    private String currentFolder(){
+    private String currentFolder() {
         ProcessBuilder processBuilder = new ProcessBuilder(
                 "powershell.exe",
                 "-Command",
-                "pwd"
-        );
+                "pwd");
         String line = "";
         try {
             Process process = processBuilder.start();

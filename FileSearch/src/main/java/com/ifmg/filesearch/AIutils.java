@@ -40,7 +40,7 @@ public class AIutils {
         // Constrói o DTO que será serializado: {"model": "...", "prompt": "...",
         // "stream": false}
         OllamaRequest ollamaRequest = new OllamaRequest(model, prompt);
-            ollamaRequest.setContextSize(16384); // Ajuste conforme necessário
+        ollamaRequest.setContextSize(16384); // Ajuste conforme necessário
 
         try {
             // 1. Serializa o objeto Java para o JSON exigido pelo Ollama
@@ -82,9 +82,10 @@ public class AIutils {
         }
     }
 
-    public String generatePrompt(List<Integer> matchedIndexes, String[] filesContents, String description){
+    public String generatePrompt(List<Integer> matchedIndexes, String[] filesContents, String description) {
         StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("Você é um buscador de arquivos inteligente. Com base nos seguintes conteúdos de arquivos:\n\n");
+        promptBuilder.append(
+                "Você é um buscador de arquivos inteligente. Com base nos seguintes conteúdos de arquivos:\n\n");
 
         for (int index : matchedIndexes) {
             promptBuilder.append("Conteúdo do arquivo ").append(index).append(":\n");
@@ -92,12 +93,65 @@ public class AIutils {
         }
 
         promptBuilder.append("E de acordo com a seguinte descrição da busca: ").append(description).append("\n");
-        promptBuilder.append("Ranqueie os índices dos arquivos que mais se encaixam na descrição fornecida. Responda APENAS com os índices separados por vírgulas. Se nenhum arquivo for relevante, responda com -1.\n");
+        promptBuilder.append(
+                "Ranqueie os índices dos arquivos que mais se encaixam na descrição fornecida. Responda APENAS com os índices separados por vírgulas. Se nenhum arquivo for relevante, responda com -1.\n");
 
         String prompt = promptBuilder.toString();
         return prompt;
     }
 
+    public void ensureOllamaServerIsRunning() {
+        if (!isOllamaRunning()) {
+            System.out.println("Ollama não detectado. Iniciando servidor...");
+            startOllamaServer();
+
+            // Aguarda alguns segundos para o servidor subir
+            try {
+                System.out.println("Aguardando inicialização do Ollama...");
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            System.out.println("Servidor Ollama já está rodando.");
+        }
+    }
+
+    private boolean isOllamaRunning() {
+        try {
+            // Tenta fazer um ping simples na raiz do servidor
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:11434")) // URL base do Ollama
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void startOllamaServer() {
+        try {
+            // Comando para iniciar o servidor. No Windows, 'ollama serve' funciona se
+            // estiver no PATH.
+            ProcessBuilder builder = new ProcessBuilder("ollama", "serve");
+            builder.redirectErrorStream(true); // Redireciona erros para o output padrão
+
+            // Inicia o processo em background
+            Process process = builder.start();
+
+            // Opcional: Ler a saída do processo em uma thread separada para debug (similar
+            // ao FileFinder)
+            // Mas como 'serve' roda continuamente, não devemos usar 'waitFor()' aqui.
+            System.out.println("Comando de inicialização enviado.");
+
+        } catch (IOException e) {
+            System.err.println("Falha ao tentar iniciar o Ollama automaticamente: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String[] args) {
         AIutils aiutils = new AIutils();
@@ -106,4 +160,3 @@ public class AIutils {
         System.out.println("Resposta da IA: " + resposta);
     }
 }
-

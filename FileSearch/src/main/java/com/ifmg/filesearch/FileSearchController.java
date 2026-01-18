@@ -107,15 +107,21 @@ public class FileSearchController {
         if (btnParar != null) {
             btnParar.setDisable(true);
         }
+
+        new Thread(() -> {
+            AIutils ai = new AIutils();
+            ai.ensureOllamaServerIsRunning();
+        }).start();
     }
 
     @FXML
     protected void selecionarPastaBase(ActionEvent event) {
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Selecione a pasta base para a busca");
-        
+
         // Tenta iniciar na pasta que já está escrita ou na home do usuário
-        String caminhoAtual = textFieldPastaBase.getText();
+        String caminhoAtual = textFieldPastaBase.getText().trim();
+        caminhoAtual = caminhoAtual.replace("\\", "/");
         if (caminhoAtual != null && !caminhoAtual.isEmpty()) {
             File f = new File(caminhoAtual);
             if (f.exists() && f.isDirectory()) {
@@ -130,7 +136,8 @@ public class FileSearchController {
         File selectedDirectory = directoryChooser.showDialog(stage);
 
         if (selectedDirectory != null) {
-            // Atualiza o campo de texto com o caminho absoluto (trocando barras invertidas se necessário)
+            // Atualiza o campo de texto com o caminho absoluto (trocando barras invertidas
+            // se necessário)
             textFieldPastaBase.setText(selectedDirectory.getAbsolutePath().replace("\\", "/"));
         }
     }
@@ -187,10 +194,11 @@ public class FileSearchController {
             tiposSelecionados.add(".docx");
         if (checkTxt.isSelected())
             tiposSelecionados.add(".txt");
-        if (checkPng.isSelected())
+        if (checkPng.isSelected()){
             tiposSelecionados.add(".png");
             tiposSelecionados.add(".jpg");
             tiposSelecionados.add(".jpeg");
+        }
         if (checkXlsx.isSelected())
             tiposSelecionados.add(".xlsx");
         if (checkPptx.isSelected())
