@@ -148,6 +148,7 @@ public class FileSearchController {
             // true indica que pode interromper a thread se ela estiver em execução
             tarefaBuscaAtual.cancel(true);
             listViewResultados.getItems().add("Cancelando busca... aguarde.");
+            FileFinder.killPowershell();
         }
     }
 
