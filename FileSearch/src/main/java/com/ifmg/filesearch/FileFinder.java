@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 public class FileFinder {
 
@@ -61,7 +62,8 @@ public class FileFinder {
             // Read the output from the PowerShell command in a separate thread to prevent
             // deadlock
             Thread outputThread = new Thread(() -> {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         if (!line.trim().isEmpty()) {
@@ -107,6 +109,7 @@ public class FileFinder {
 
     private static String buildCommand(String descricao, List<String> tiposSelecionados, String pasta) {
         StringBuilder resultado = new StringBuilder();
+        resultado.append("$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ");
         resultado.append("Get-ChildItem -Path ");
 
         // CORREÇÃO: Usar aspas simples para o caminho e escapar aspas existentes

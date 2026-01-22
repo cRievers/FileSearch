@@ -11,6 +11,9 @@ module com.ifmg.filesearch {
     requires org.apache.lucene.analysis.common;
     requires org.apache.tika.core;
     requires org.slf4j;
+    requires org.apache.commons.io;
+    requires tess4j;
+    requires com.sun.jna;
 
     opens com.ifmg.filesearch to javafx.fxml, com.fasterxml.jackson.databind;
     exports com.ifmg.filesearch;
