@@ -97,3 +97,66 @@ public class FileIndexer {
 2.  **Multithreading:** O `walkFileTree` é single-threaded por natureza de I/O de disco. No entanto, a **extração de conteúdo** (especialmente PDF e OCR) é CPU-intensive. Use um `ExecutorService` (FixedThreadPool) para processar o conteúdo dos arquivos em paralelo enquanto a thread principal continua varrendo o disco.
 3.  **Análise de Arquivos Grandes:** Defina um limite de tamanho (ex: 50MB) para evitar estourar a memória (Heap Space) ao ler arquivos de texto gigantes.
 4.  **Try-with-resources:** Garanta que o `IndexWriter` seja fechado corretamente para evitar corrupção do índice (`lock` do Lucene).
+
+
+Este Documento de Requisitos de Produto (PRD) foca especificamente na "ponte" entre a varredura do sistema de arquivos e a preparação dos dados para o motor de busca Apache Lucene, utilizando a estrutura pré-existente no projeto `crievers/filesearch`[cite: 1].
+
+---
+
+## 📄 PRD: Integração FileIndexer ↔ FileExtractor
+
+### 1. Visão Geral
+A integração visa transformar arquivos brutos encontrados no disco em **Documentos Lucene** pesquisáveis. O `FileIndexer` atua como o orquestrador de fluxo (pipeline), enquanto o `FileExtractor` atua como o provedor de dados textuais[cite: 1].
+
+### 2. Objetivos da Integração
+*   **Extração Transparente:** Converter PDF, Word, TXT e Imagens (OCR) em strings de texto limpas para indexação[cite: 1].
+*   **Consistência de Dados:** Garantir que metadados (caminho, data de modificação) estejam sincronizados com o conteúdo textual.
+*   **Resiliência:** Impedir que um arquivo corrompido interrompa o processo de varredura total.
+
+### 3. User Stories (Back-end)
+*   **Extração em Fluxo:** Como sistema, quero enviar um `Path` para o `FileExtractor` e receber o conteúdo processado para alimentar o `IndexWriter`.
+*   **Filtragem por Extensão:** Como sistema, quero que o `FileIndexer` ignore arquivos cujas extensões não sejam suportadas pelo `FileExtractor` antes de tentar abri-los.
+*   **Rastreamento de Modificação:** Como usuário, quero que apenas arquivos alterados desde a última varredura sejam reprocessados para economizar bateria e CPU.
+
+---
+
+### 4. Fluxo de Trabalho Técnico (Workflow)
+
+Abaixo, a sequência de operações planejada para o `FileIndexer.java` utilizando a estrutura de `crievers/filesearch`[cite: 1]:
+
+| Etapa | Responsável | Ação Técnica |
+| :--- | :--- | :--- |
+| **1. Descoberta** | `FileIndexer` | Executa `Files.walkFileTree` para percorrer os diretórios[cite: 1]. |
+| **2. Validação** | `FileIndexer` | Verifica se a extensão consta na lista de suporte (PDF, DOCX, TXT, etc.). |
+| **3. Extração** | `FileExtractor` | Abre o arquivo, identifica o MIME type e extrai o texto puro[cite: 1]. |
+| **4. Transformação** | `FileIndexer` | Cria um objeto `org.apache.lucene.document.Document`. |
+| **5. Persistência** | `Lucene Engine` | O `IndexWriter` armazena o documento no índice local. |
+
+---
+
+### 5. Requisitos Funcionais
+
+#### **5.1. Mapeamento de Campos (Lucene Schema)**
+Para que a busca funcione conforme o objetivo (estilo ChatGPT/RAG), cada arquivo deve ser indexado com:
+*   `id`: Caminho absoluto do arquivo (Chave Primária).
+*   `content`: Conteúdo textual retornado pelo `FileExtractor`[cite: 1].
+*   `filename`: Apenas o nome para buscas por título.
+*   `modified`: Timestamp de última modificação (para indexação incremental).
+
+#### **5.2. Tratamento de Erros e Exceções**
+*   **Arquivos Protegidos:** Se o `FileExtractor` encontrar um PDF com senha, o `FileIndexer` deve logar o aviso e pular para o próximo arquivo sem travar o loop[cite: 1].
+*   **Arquivos Vazios:** Arquivos sem texto extraível não devem ocupar espaço no índice.
+
+---
+
+### 6. Restrições Técnicas e Performance (Dicas de Sênior)
+
+*   **Memory Management:** O `FileExtractor` deve processar arquivos grandes preferencialmente via *Streams*. Evite carregar um PDF de 500MB inteiro na memória RAM (Heap Space) antes de passar para o Lucene[cite: 1].
+*   **Batch Commits:** Não execute `writer.commit()` para cada arquivo. Acumule documentos na memória e faça o commit a cada 100-500 arquivos indexados para otimizar o I/O do disco.
+*   **Uso de IA (Gemma 3):** Nesta fase de indexação, a IA ainda não entra. O Lucene prepara o terreno. A Gemma 3 será utilizada na fase de **Busca e Resposta**, lendo o que o Lucene recuperou[cite: 1].
+
+### 7. Roadmap de Implementação da Integração
+
+1.  **Semana 1:** Implementar o `SimpleFileVisitor` no `FileIndexer` e conectar ao `IndexWriter`.
+2.  **Semana 1 (Fim):** Criar o método `documentFactory(Path p)` que chama o `FileExtractor.extract(p)` e monta o documento Lucene[cite: 1].
+3.  **Semana 2:** Adicionar lógica de "Upsert" (Update ou Insert) baseada no campo `modified` para evitar re-indexação desnecessária.
