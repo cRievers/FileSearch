@@ -32,3 +32,17 @@ Este documento lista as tarefas pendentes para a integração do motor de busca 
     - [x] Configurar `ExecutorService` para desacoplar a varredura (I/O) da extração de conteúdo (CPU).
 - [x] **Gerenciamento de Memória**
     - [x] Validar o uso de Streams no `FileExtractor` para arquivos grandes.
+
+## Fase 5: Integração e Próximos Passos
+- [ ] **Migração para Busca Direta no Lucene**
+    - [ ] Desacoplar busca do `FileFinder` (PowerShell).
+    - [ ] Implementar busca por palavras-chave e filtros diretamente no `FSDirectory` do Lucene.
+- [ ] **Implementação da Interface de Chat (RAG)**
+    - [ ] Criar aba de Chat na UI JavaFX.
+    - [ ] Implementar fluxo de contexto: Lucene Results -> Gemma 3 Prompt -> Answer.
+- [ ] **Sincronização em Tempo Real**
+    - [ ] Implementar `FileWatcherService` usando `java.nio.file.WatchService`.
+    - [ ] Integrar watcher com o `FileIndexer` para atualizações incrementais automáticas.
+- [ ] **Refinamento de UI/UX**
+    - [ ] Adicionar barra de progresso para indexação em background.
+    - [ ] Implementar painel de preview de conteúdo.

@@ -1,23 +1,32 @@
 # Planejamento Técnico - FileIndexer
 
-Este documento detalha a implementação do `FileIndexer.java` e estratégias de performance.
+Este documento detalha a implementação do `FileIndexer.java` e as estratégias de performance para a indexação de arquivos locais.
 
 ## 1. Estratégia de Varredura
-Utilizaremos o `Files.walkFileTree` que implementa o padrão *Visitor*, sendo performático para grandes árvores de diretórios.
+Utilizaremos o `Files.walkFileTree`, que implementa o padrão *Visitor*. Esta é a escolha mais performática para grandes árvores de diretórios, superando o `Files.list()` em termos de eficiência de I/O.
 
-### Estratégia Técnica
+### Detalhes Técnicos
 * **Pattern:** `SimpleFileVisitor<Path>`.
 * **Motor de Busca:** Apache Lucene 9.x.
-* **Campos do Lucene:**
-    * `path`: (StringField) Caminho completo (ID único, não tokenizado).
-    * `filename`: (TextField) Nome do arquivo.
-    * `content`: (TextField) Conteúdo extraído.
-    * `extension`: (StringField) Filtros rápidos.
-    * `lastModified`: (LongPoint) Indexação incremental.
+* **Workflow de Indexação:**
+    1. **Descoberta:** `FileIndexer` percorre diretórios via `walkFileTree`.
+    2. **Validação:** Filtra extensões suportadas (PDF, DOCX, TXT, etc.).
+    3. **Extração:** `FileExtractor` obtém o texto puro e metadados.
+    4. **Transformação:** Conversão para `org.apache.lucene.document.Document`.
+    5. **Persistência:** `IndexWriter` armazena o documento de forma incremental.
 
-## 2. Arquitetura do FileIndexer
-O indexador orquestra a descoberta e decide o que indexar.
+## 2. Arquitetura e Lucene Schema
+O indexador orquestra a descoberta e decide o que indexar, mapeando os arquivos para o seguinte esquema:
 
+| Campo | Tipo Lucene | Descrição |
+| :--- | :--- | :--- |
+| `id` | `StringField` | Caminho absoluto (Chave Primária, não tokenizado). |
+| `filename` | `TextField` | Nome do arquivo para buscas parciais por título. |
+| `content` | `TextField` | Conteúdo textual extraído (tokenizado). |
+| `extension` | `StringField` | Extensão para filtragem rápida. |
+| `modified` | `LongPoint` | Timestamp de última modificação para indexação incremental. |
+
+### Esboço da Implementação
 ```java
 public class FileIndexer {
     private final IndexWriter writer;
@@ -28,6 +37,7 @@ public class FileIndexer {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                 String name = dir.getFileName().toString();
+                // Ignorar pastas ocultas ou de sistema
                 if (name.startsWith(".") || name.equals("node_modules") || name.equals("target")) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
@@ -53,13 +63,20 @@ public class FileIndexer {
     private void indexFile(Path file, BasicFileAttributes attrs) {
         // 1. Extrair texto usando o FileExtractor
         // 2. Criar Document do Lucene
-        // 3. writer.updateDocument(new Term("path", path), doc)
+        // 3. writer.updateDocument(new Term("id", path), doc) -> Upsert
     }
 }
 ```
 
-## 3. Considerações de Performance
-1. **Indexação Incremental:** Use `writer.updateDocument` com o campo `path` como chave.
-2. **Multithreading:** Use `ExecutorService` para extração de conteúdo (CPU-intensive) enquanto a thread principal varre o disco (I/O).
-3. **Limite de Memória:** Defina limites para arquivos gigantes (ex: 50MB).
-4. **Try-with-resources:** Garanta o fechamento do `IndexWriter` para evitar corrupção.
+## 3. Considerações de Performance e Resiliência
+1. **Indexação Incremental (Upsert):** Use `writer.updateDocument` com o campo `id` como chave. Compare o timestamp `modified` no disco com o do índice para evitar reprocessamento desnecessário.
+2. **Multithreading:** Utilize um `ExecutorService` (FixedThreadPool) para a extração de conteúdo (CPU-intensive), enquanto a thread principal continua a varredura do disco (I/O-intensive).
+3. **Batch Commits:** Não execute `writer.commit()` para cada arquivo. Acumule documentos e faça o commit a cada 100-500 arquivos para otimizar o I/O.
+4. **Gerenciamento de Memória:** 
+    - O `FileExtractor` deve usar *Streams* para processar arquivos grandes (ex: > 50MB).
+    - Evite carregar conteúdos gigantes inteiros na Heap Space.
+5. **Tratamento de Erros:**
+    - **Arquivos Protegidos:** Se um PDF tiver senha, logue o aviso e pule para o próximo.
+    - **Arquivos Vazios:** Não devem ser indexados para economizar espaço.
+    - **Try-with-resources:** Sempre garanta o fechamento do `IndexWriter` para evitar corrupção do índice (`write.lock`).
+
