@@ -57,6 +57,7 @@ public class FileSearchController {
     // Mapa para associar o nome do arquivo ao seu caminho completo
     private final Map<String, String> mapaResultados = new HashMap<>();
     private final ObservableList<String> palavrasChave = FXCollections.observableArrayList();
+    private static final String INDEX_PATH = "lucene_index";
 
     @FXML
     public void initialize() {
@@ -233,64 +234,19 @@ public class FileSearchController {
                 if (isCancelled())
                     return null;
 
-                // --- Passo A: Busca de Arquivos no Sistema (PowerShell) ---
-                updateMessage("Listando arquivos...");
-                // Nota: Ajuste o caminho 'C:/Users/...' conforme sua necessidade ou pegue de um
-                // input
-                new FileFinder(descricao, tiposSelecionados, pastaBaseFinal);
-                String[] paths = FileFinder.search();
-
-                if (paths == null || paths.length == 0) {
-                    return new LinkedHashMap<>();
-                }
+                // --- Passo A: Busca Preliminar (Lucene) ---
+                updateMessage("Filtrando índice persistente...");
+                Filter filtroService = new Filter(INDEX_PATH);
 
                 if (isCancelled())
                     return null;
 
-                // --- Passo B: Extração de Texto ---
-                updateMessage("Lendo conteúdo (" + paths.length + " arquivos)...");
-
-                List<String> conteudos = new ArrayList<>();
-                List<String> nomesArquivos = new ArrayList<>();
-                Map<String, String> mapNomeParaPath = new HashMap<>();
-
-                for (String path : paths) {
-                    if (isCancelled())
-                        return null;
-
-                    File f = new File(path);
-                    // Otimização: Se o arquivo for muito grande, talvez pular ou ler parcial no
-                    // FileExtractor
-                    String texto = FileExtractor.extractFile(path);
-
-                    if (texto != null && !texto.startsWith("Unsupported") && !texto.startsWith("This is not")) {
-                        conteudos.add(texto);
-                        nomesArquivos.add(f.getName());
-                        mapNomeParaPath.put(f.getName(), path);
-                    }
-                }
-
-                if (conteudos.isEmpty())
-                    return new LinkedHashMap<>();
-
-                // --- Passo C: Filtro Híbrido (Lucene + IA em Lotes) ---
-
-                // 1. Configura e Indexa no Lucene
-                updateMessage("Criando índice de busca...");
-                Filter filtroService = new Filter();
-                filtroService.indexarArquivos(nomesArquivos, conteudos);
-
-                if (isCancelled())
-                    return null;
-
-                // 2. Busca Preliminar (Lucene) - Reduz de N arquivos para Top 20 (por exemplo)
-                updateMessage("Filtrando por palavras-chave...");
-                // Converte ObservableList para List normal
                 List<String> listaKeywords = new ArrayList<>(palavrasChave);
 
-                // Busca até 20 candidatos que contenham as palavras-chave ou termos da
-                // descrição
-                List<Filter.DocumentoCandidato> candidatos = filtroService.buscarNoLucene(descricao, listaKeywords, 20);
+                // Busca candidatos no índice persistente do Lucene
+                List<Filter.DocumentoCandidato> candidatos = filtroService.buscarNoLucene(
+                    descricao, listaKeywords, pastaBaseFinal, tiposSelecionados, 50
+                );
 
                 System.out.println("Lucene encontrou " + candidatos.size() + " candidatos.");
 
@@ -298,23 +254,29 @@ public class FileSearchController {
                     return new LinkedHashMap<>();
                 }
 
-                // 3. Refinamento Semântico (Ollama em Lotes)
+                if (isCancelled())
+                    return null;
+
+                // --- Passo B: Refinamento Semântico (Ollama em Lotes) ---
                 updateMessage("Analisando contexto com IA (em lotes)...");
                 List<String> nomesAprovados;
 
-                // Se o usuário não digitou descrição, só keywords, confiamos no Lucene
-                // Se tem descrição semântica ("quero o arquivo que fala sobre..."), usamos o
-                // Ollama
                 if (!descricao.trim().isEmpty()) {
                     nomesAprovados = filtroService.filtrarComOllamaEmLotes(descricao, candidatos);
                 } else {
-                    // Se só tem keywords, o Lucene já fez o trabalho exato
                     nomesAprovados = new ArrayList<>();
-                    for (Filter.DocumentoCandidato d : candidatos)
+                    for (Filter.DocumentoCandidato d : candidatos) {
                         nomesAprovados.add(d.filename);
+                    }
                 }
 
-                // --- Passo D: Montar Resultado Final ---
+                // Mapeia nome do arquivo para caminho absoluto a partir dos candidatos
+                Map<String, String> mapNomeParaPath = new HashMap<>();
+                for (Filter.DocumentoCandidato d : candidatos) {
+                    mapNomeParaPath.put(d.filename, d.id);
+                }
+
+                // --- Passo C: Montar Resultado Final ---
                 LinkedHashMap<String, String> resultadoFinal = new LinkedHashMap<>();
                 for (String nome : nomesAprovados) {
                     if (mapNomeParaPath.containsKey(nome)) {

@@ -25,7 +25,7 @@ Este documento lista as tarefas pendentes para a integração do motor de busca 
     - [x] Usar `writer.updateDocument(new Term("id", path), doc)` para evitar duplicatas.
     - [x] Adicionar verificação de timestamp: só indexar se `modified` no disco > `modified` no índice.
 - [x] **Batch Commits**
-    - [x] Implementar contador para executar `writer.commit()` a cada 100-500 arquivos.
+    - [x] Implementar contador para executar `writer.commit()` a cada 100-500 arquivos (200).
 
 ## Fase 4: Performance e Segurança
 - [x] **Processamento Assíncrono**
@@ -34,9 +34,9 @@ Este documento lista as tarefas pendentes para a integração do motor de busca 
     - [x] Validar o uso de Streams no `FileExtractor` para arquivos grandes.
 
 ## Fase 5: Integração e Próximos Passos
-- [ ] **Migração para Busca Direta no Lucene**
-    - [ ] Desacoplar busca do `FileFinder` (PowerShell).
-    - [ ] Implementar busca por palavras-chave e filtros diretamente no `FSDirectory` do Lucene.
+- [x] **Migração para Busca Direta no Lucene**
+    - [x] Desacoplar busca do `FileFinder` (PowerShell).
+    - [x] Implementar busca por palavras-chave e filtros diretamente no `FSDirectory` do Lucene.
 - [ ] **Implementação da Interface de Chat (RAG)**
     - [ ] Criar aba de Chat na UI JavaFX.
     - [ ] Implementar fluxo de contexto: Lucene Results -> Gemma 3 Prompt -> Answer.

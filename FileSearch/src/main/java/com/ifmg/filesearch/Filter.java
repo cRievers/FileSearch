@@ -14,8 +14,6 @@ import org.apache.lucene.store.Directory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
 public class Filter {
 
@@ -27,6 +25,17 @@ public class Filter {
     public Filter() {
         // Inicializa um novo diretório na RAM para cada instância (busca nova = índice novo)
         this.indexDirectory = new ByteBuffersDirectory();
+        this.analyzer = new StandardAnalyzer();
+        this.aiUtils = new AIutils();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public Filter(String indexPath) throws IOException {
+        java.nio.file.Path path = java.nio.file.Paths.get(indexPath);
+        if (!java.nio.file.Files.exists(path)) {
+            java.nio.file.Files.createDirectories(path);
+        }
+        this.indexDirectory = org.apache.lucene.store.FSDirectory.open(path);
         this.analyzer = new StandardAnalyzer();
         this.aiUtils = new AIutils();
         this.objectMapper = new ObjectMapper();
@@ -75,14 +84,80 @@ public class Filter {
         
         List<DocumentoCandidato> lista = new ArrayList<>();
         for (ScoreDoc scoreDoc : results.scoreDocs) {
-            Document doc = searcher.doc(scoreDoc.doc);
+            Document doc = searcher.storedFields().document(scoreDoc.doc);
             String conteudo = doc.get("content");
             
             // Trunca conteúdo para economizar tokens na próxima etapa
             // 2000 chars é uma margem segura para chunks
-            if (conteudo.length() > 2000) conteudo = conteudo.substring(0, 2000) + "...";
+            if (conteudo != null && conteudo.length() > 2000) conteudo = conteudo.substring(0, 2000) + "...";
             
             lista.add(new DocumentoCandidato(doc.get("filename"), conteudo));
+        }
+        reader.close();
+        return lista;
+    }
+
+    // 2b. Filtro Grosso com Lucene no Índice Persistente (Keywords + Descrição + Pasta Base + Extensões)
+    public List<DocumentoCandidato> buscarNoLucene(String descricao, List<String> keywords, String pastaBase, List<String> tiposSelecionados, int limite) throws Exception {
+        if (!DirectoryReader.indexExists(indexDirectory)) return new ArrayList<>();
+
+        DirectoryReader reader = DirectoryReader.open(indexDirectory);
+        IndexSearcher searcher = new IndexSearcher(reader);
+        
+        BooleanQuery.Builder mainQueryBuilder = new BooleanQuery.Builder();
+
+        // 1. Constrói a query de busca textual (Keywords + Descrição)
+        StringBuilder queryBuilder = new StringBuilder();
+        
+        for (String key : keywords) {
+            queryBuilder.append("content:").append(QueryParser.escape(key)).append("^2.0 "); 
+        }
+        
+        if (!descricao.isEmpty()) {
+            queryBuilder.append(QueryParser.escape(descricao));
+        }
+
+        String queryString = queryBuilder.toString().trim();
+        if (queryString.isEmpty()) queryString = "*:*";
+
+        QueryParser parser = new QueryParser("content", analyzer);
+        Query contentQuery = parser.parse(queryString);
+        mainQueryBuilder.add(contentQuery, BooleanClause.Occur.MUST);
+
+        // 2. Filtro por Pasta Base (PrefixQuery no campo id)
+        if (pastaBase != null && !pastaBase.isEmpty()) {
+            String normalizedBasePath = java.nio.file.Paths.get(pastaBase).toAbsolutePath().toString();
+            if (!normalizedBasePath.endsWith(java.io.File.separator)) {
+                normalizedBasePath += java.io.File.separator;
+            }
+            PrefixQuery pathQuery = new PrefixQuery(new Term("id", normalizedBasePath));
+            mainQueryBuilder.add(pathQuery, BooleanClause.Occur.MUST);
+        }
+
+        // 3. Filtro por extensões
+        if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
+            BooleanQuery.Builder extQueryBuilder = new BooleanQuery.Builder();
+            for (String ext : tiposSelecionados) {
+                String extClean = ext.startsWith(".") ? ext.substring(1) : ext;
+                extQueryBuilder.add(new TermQuery(new Term("extension", extClean.toLowerCase())), BooleanClause.Occur.SHOULD);
+            }
+            mainQueryBuilder.add(extQueryBuilder.build(), BooleanClause.Occur.MUST);
+        }
+        
+        TopDocs results = searcher.search(mainQueryBuilder.build(), limite);
+        
+        List<DocumentoCandidato> lista = new ArrayList<>();
+        for (ScoreDoc scoreDoc : results.scoreDocs) {
+            Document doc = searcher.storedFields().document(scoreDoc.doc);
+            String conteudo = doc.get("content");
+            String id = doc.get("id");
+            String filename = doc.get("filename");
+            
+            if (conteudo != null && conteudo.length() > 2000) {
+                conteudo = conteudo.substring(0, 2000) + "...";
+            }
+            
+            lista.add(new DocumentoCandidato(id, filename, conteudo));
         }
         reader.close();
         return lista;
@@ -160,10 +235,17 @@ public class Filter {
 
     // Classe auxiliar interna
     public static class DocumentoCandidato {
+        public String id;
         public String filename;
         public String content;
 
         public DocumentoCandidato(String filename, String content) {
+            this.filename = filename;
+            this.content = content;
+        }
+
+        public DocumentoCandidato(String id, String filename, String content) {
+            this.id = id;
             this.filename = filename;
             this.content = content;
         }
