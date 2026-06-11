@@ -164,7 +164,7 @@ public class Filter {
     }
 
     // 3. Filtro Fino com Ollama EM LOTES
-    public List<String> filtrarComOllamaEmLotes(String intencaoUsuario, List<DocumentoCandidato> candidatos) {
+    public List<String> filtrarComOllamaEmLotes(String intencaoUsuario, List<DocumentoCandidato> candidatos, java.util.function.Consumer<List<String>> onBatchProcessed) {
         List<String> arquivosFinais = new ArrayList<>();
         
         // Configuração do Lote
@@ -188,12 +188,22 @@ public class Filter {
                 List<String> aprovadosNoLote = processarRespostaIA(respostaJson);
                 arquivosFinais.addAll(aprovadosNoLote);
                 
+                // Retorna os resultados à medida em que são processados
+                if (onBatchProcessed != null) {
+                    onBatchProcessed.accept(aprovadosNoLote);
+                }
+                
             } catch (Exception e) {
                 System.err.println("Erro ao processar lote " + i + ": " + e.getMessage());
             }
         }
         
         return arquivosFinais;
+    }
+
+    // Sobrecarga para retrocompatibilidade
+    public List<String> filtrarComOllamaEmLotes(String intencaoUsuario, List<DocumentoCandidato> candidatos) {
+        return filtrarComOllamaEmLotes(intencaoUsuario, candidatos, null);
     }
 
     private String montarPromptLote(String intencao, List<DocumentoCandidato> lote) throws Exception {

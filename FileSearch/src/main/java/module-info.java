@@ -10,6 +10,7 @@ module com.ifmg.filesearch {
     requires org.apache.lucene.queryparser;
     requires org.apache.lucene.analysis.common;
     requires org.apache.tika.core;
+    requires java.xml;
     requires org.slf4j;
     requires org.apache.commons.io;
     requires tess4j;

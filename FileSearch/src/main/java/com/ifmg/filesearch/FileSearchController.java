@@ -10,13 +10,18 @@ import javafx.stage.Stage;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.application.Platform;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
+import javafx.util.Duration;
 import java.util.LinkedHashMap;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileSearchController {
 
@@ -57,7 +62,14 @@ public class FileSearchController {
     // Mapa para associar o nome do arquivo ao seu caminho completo
     private final Map<String, String> mapaResultados = new HashMap<>();
     private final ObservableList<String> palavrasChave = FXCollections.observableArrayList();
-    private static final String INDEX_PATH = "lucene_index";
+    private static final String INDEX_PATH = Paths.get(System.getProperty("user.home"), ".filesearch", "lucene_index").toAbsolutePath().toString();
+
+    // --- Estado da indexação em background ---
+    private volatile boolean indexacaoConcluida = false;
+    private final AtomicInteger arquivosIndexados = new AtomicInteger(0);
+    private volatile long indexacaoInicio = 0;
+    // Timeline para auto-retry da busca assim que a indexação terminar
+    private Timeline retryTimeline;
 
     @FXML
     public void initialize() {
@@ -109,10 +121,69 @@ public class FileSearchController {
             btnParar.setDisable(true);
         }
 
+        // Inicia Ollama em background
         new Thread(() -> {
             AIutils ai = new AIutils();
             ai.ensureOllamaServerIsRunning();
         }).start();
+
+        // Indexação inicial em background usando a pasta base padrão
+        indexacaoInicio = System.currentTimeMillis();
+        new Thread(() -> {
+            String pastaBase = textFieldPastaBase.getText() != null ? textFieldPastaBase.getText().trim() : "C:/Users/";
+            if (pastaBase.isEmpty()) pastaBase = "C:/Users/";
+            System.out.println("--- Iniciando Indexação em Background ---");
+            System.out.println("Pasta base: " + pastaBase);
+            System.out.println("Índice em: " + INDEX_PATH);
+
+            // Atualiza o status na UI a cada arquivo indexado
+            Platform.runLater(() -> listViewResultados.getItems().setAll(
+                "⏳ Indexando seus arquivos em segundo plano...",
+                "   A primeira busca será executada automaticamente ao concluir."
+            ));
+
+            try (FileIndexer indexer = new FileIndexer(INDEX_PATH)) {
+                indexer.setProgressCallback(count -> {
+                    arquivosIndexados.set(count);
+                    // Atualiza o contador na UI a cada 50 arquivos para não sobrecarregar
+                    if (count % 50 == 0) {
+                        long elapsed = (System.currentTimeMillis() - indexacaoInicio) / 1000;
+                        Platform.runLater(() -> listViewResultados.getItems().setAll(
+                            "⏳ Indexando... " + count + " arquivos processados (≈" + elapsed + "s)",
+                            "   A busca será executada automaticamente ao concluir."
+                        ));
+                    }
+                });
+
+                indexer.setOnCompleteCallback(() -> {
+                    indexacaoConcluida = true;
+                    long elapsed = (System.currentTimeMillis() - indexacaoInicio) / 1000;
+                    System.out.println("--- Indexação em Background Concluída: "
+                        + arquivosIndexados.get() + " arquivos em " + elapsed + "s ---");
+                    Platform.runLater(() -> {
+                        // Se há um retry agendado, dispara a busca agora
+                        if (retryTimeline != null) {
+                            retryTimeline.stop();
+                            retryTimeline = null;
+                            realizarBusca();
+                        } else {
+                            listViewResultados.getItems().setAll(
+                                "✅ Indexação concluída! " + arquivosIndexados.get() + " arquivos indexados em " + elapsed + "s.",
+                                "   Pronto para buscar."
+                            );
+                        }
+                    });
+                });
+
+                indexer.indexDirectory(Paths.get(pastaBase));
+            } catch (Exception e) {
+                System.err.println("Erro na indexação em background: " + e.getMessage());
+                e.printStackTrace();
+                Platform.runLater(() -> listViewResultados.getItems().setAll(
+                    "⚠️ Erro na indexação: " + e.getMessage()
+                ));
+            }
+        }, "BackgroundIndexer").start();
     }
 
     @FXML
@@ -220,6 +291,48 @@ public class FileSearchController {
         System.out.println("--- Iniciando Busca em Segundo Plano ---");
         System.out.println("Descrição: " + descricao);
 
+        // --- Guarda de Indexação: se o índice ainda não está pronto, mostra status e agenda retry ---
+        if (!indexacaoConcluida) {
+            long elapsed = (System.currentTimeMillis() - indexacaoInicio) / 1000;
+            int indexed = arquivosIndexados.get();
+
+            listViewResultados.getItems().setAll(
+                "⏳ Indexação em andamento... aguarde.",
+                "   📁 " + indexed + " arquivos processados até agora (≈" + elapsed + "s decorridos)",
+                "   🔄 Sua busca será executada automaticamente ao concluir a indexação.",
+                "   Ou aguarde e clique em Buscar novamente."
+            );
+
+            // Agenda um retry que vai disparar assim que indexacaoConcluida = true
+            if (retryTimeline == null) {
+                retryTimeline = new Timeline(new KeyFrame(Duration.seconds(3), e -> {
+                    if (indexacaoConcluida && retryTimeline != null) {
+                        retryTimeline.stop();
+                        retryTimeline = null;
+                        realizarBusca();
+                    } else {
+                        // Atualiza o contador enquanto aguarda
+                        long el = (System.currentTimeMillis() - indexacaoInicio) / 1000;
+                        int idx = arquivosIndexados.get();
+                        listViewResultados.getItems().setAll(
+                            "⏳ Indexação em andamento... aguarde.",
+                            "   📁 " + idx + " arquivos processados (≈" + el + "s decorridos)",
+                            "   🔄 Sua busca será executada automaticamente ao concluir.",
+                            "   Ou aguarde e clique em Buscar novamente."
+                        );
+                    }
+                }));
+                retryTimeline.setCycleCount(Timeline.INDEFINITE);
+                retryTimeline.play();
+            }
+            return; // Não inicia a task de busca ainda
+        }
+
+        // Cancela qualquer retry pendente (usuário clicou manualmente após indexar)
+        if (retryTimeline != null) {
+            retryTimeline.stop();
+            retryTimeline = null;
+        }
         // 3. Configura botões
         if (btnBuscar != null)
             btnBuscar.setDisable(true);
@@ -261,19 +374,34 @@ public class FileSearchController {
                 updateMessage("Analisando contexto com IA (em lotes)...");
                 List<String> nomesAprovados;
 
+                // Mapeia nome do arquivo para caminho absoluto a partir dos candidatos
+                Map<String, String> mapNomeParaPath = new HashMap<>();
+                for (Filter.DocumentoCandidato d : candidatos) {
+                    mapNomeParaPath.put(d.filename, d.id);
+                }
+
                 if (!descricao.trim().isEmpty()) {
-                    nomesAprovados = filtroService.filtrarComOllamaEmLotes(descricao, candidatos);
+                    Platform.runLater(() -> {
+                        listViewResultados.getItems().add("⏳ Processando IA em lotes... Resultados aparecerão abaixo:");
+                    });
+                    
+                    nomesAprovados = filtroService.filtrarComOllamaEmLotes(descricao, candidatos, aprovadosNoLote -> {
+                        if (aprovadosNoLote != null && !aprovadosNoLote.isEmpty()) {
+                            Platform.runLater(() -> {
+                                for (String nome : aprovadosNoLote) {
+                                    if (mapNomeParaPath.containsKey(nome) && !listViewResultados.getItems().contains(nome)) {
+                                        mapaResultados.put(nome, mapNomeParaPath.get(nome));
+                                        listViewResultados.getItems().add(nome);
+                                    }
+                                }
+                            });
+                        }
+                    });
                 } else {
                     nomesAprovados = new ArrayList<>();
                     for (Filter.DocumentoCandidato d : candidatos) {
                         nomesAprovados.add(d.filename);
                     }
-                }
-
-                // Mapeia nome do arquivo para caminho absoluto a partir dos candidatos
-                Map<String, String> mapNomeParaPath = new HashMap<>();
-                for (Filter.DocumentoCandidato d : candidatos) {
-                    mapNomeParaPath.put(d.filename, d.id);
                 }
 
                 // --- Passo C: Montar Resultado Final ---
