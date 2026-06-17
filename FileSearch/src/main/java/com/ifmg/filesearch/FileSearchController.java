@@ -358,10 +358,10 @@ public class FileSearchController {
 
                 // Busca candidatos no índice persistente do Lucene
                 List<Filter.DocumentoCandidato> candidatos = filtroService.buscarNoLucene(
-                    descricao, listaKeywords, pastaBaseFinal, tiposSelecionados, 50
+                    descricao, listaKeywords, pastaBaseFinal, tiposSelecionados, 15
                 );
 
-                System.out.println("Lucene encontrou " + candidatos.size() + " candidatos.");
+                System.out.println("Lucene retornou " + candidatos.size() + " candidatos relevantes após o filtro de pontuação mínima.");
 
                 if (candidatos.isEmpty()) {
                     return new LinkedHashMap<>();

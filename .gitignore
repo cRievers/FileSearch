@@ -1,2 +1,4 @@
 FileSearch/target
 /.gemini
+/lucene_index
+/.idea

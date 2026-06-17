@@ -1,6 +1,5 @@
 package com.ifmg.filesearch;
 
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
@@ -26,6 +25,8 @@ import java.io.OutputStream;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.tika.language.detect.LanguageDetector;
+import org.apache.tika.language.detect.LanguageResult;
 
 public class FileIndexer implements AutoCloseable {
 
@@ -33,10 +34,16 @@ public class FileIndexer implements AutoCloseable {
     private final ExecutorService executorService;
     private final AtomicInteger commitCounter;
     private static final int COMMIT_THRESHOLD = 200;
+    
+    private final DirectoryReader readerForCheck;
+    private final IndexSearcher searcherForCheck;
 
     // Callbacks opcionais para notificar progresso e conclusão
     private Consumer<Integer> progressCallback;
     private Runnable onCompleteCallback;
+    
+    // Detector de idiomas Tika
+    private LanguageDetector languageDetector;
 
     // Configuração de extensões
     private final Set<String> whitelist = new HashSet<>();
@@ -61,13 +68,31 @@ public class FileIndexer implements AutoCloseable {
 
     public FileIndexer(String indexPath) throws IOException {
         Directory dir = FSDirectory.open(Paths.get(indexPath));
-        IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
+        IndexWriterConfig config = new IndexWriterConfig(AnalyzerStrategyFactory.createMultilingualAnalyzer());
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
         this.writer = new IndexWriter(dir, config);
+
+        DirectoryReader r = null;
+        IndexSearcher s = null;
+        try {
+            r = DirectoryReader.open(writer);
+            s = new IndexSearcher(r);
+        } catch (IOException e) {
+            // Ignora se o índice for novo
+        }
+        this.readerForCheck = r;
+        this.searcherForCheck = s;
 
         int cores = Runtime.getRuntime().availableProcessors();
         this.executorService = Executors.newFixedThreadPool(cores);
         this.commitCounter = new AtomicInteger(0);
+        
+        try {
+            this.languageDetector = LanguageDetector.getDefaultLanguageDetector().loadModels();
+        } catch (Exception e) {
+            System.err.println("Aviso: Falha ao carregar modelo de idioma do Tika: " + e.getMessage());
+            this.languageDetector = null;
+        }
         
         loadConfiguration();
     }
@@ -255,7 +280,7 @@ public class FileIndexer implements AutoCloseable {
             diagFailExtract.incrementAndGet();
             System.err.println("[Indexer] Extração falhou para: " + file.getFileName()
                 + " | resultado: " + (content == null ? "null" : "'" + content.substring(0, Math.min(80, content.length())) + "'"));
-            return;
+            content = ""; // Permite indexar o arquivo sem conteúdo para ser encontrado por nome/extensão
         }
 
         Document doc = documentFactory(file, content, lastModified);
@@ -273,13 +298,14 @@ public class FileIndexer implements AutoCloseable {
     }
 
     private boolean shouldIndex(String id, long lastModifiedOnDisk) {
-        try (DirectoryReader reader = DirectoryReader.open(writer)) {
-            IndexSearcher searcher = new IndexSearcher(reader);
+        if (searcherForCheck == null) return true;
+        
+        try {
             TermQuery query = new TermQuery(new Term("id", id));
-            TopDocs topDocs = searcher.search(query, 1);
+            TopDocs topDocs = searcherForCheck.search(query, 1);
 
             if (topDocs.totalHits.value > 0) {
-                Document doc = searcher.storedFields().document(topDocs.scoreDocs[0].doc);
+                Document doc = searcherForCheck.storedFields().document(topDocs.scoreDocs[0].doc);
                 IndexableField modifiedField = doc.getField("modified");
                 if (modifiedField != null) {
                     long lastModifiedInIndex = modifiedField.numericValue().longValue();
@@ -287,7 +313,7 @@ public class FileIndexer implements AutoCloseable {
                 }
             }
         } catch (IOException e) {
-            // Ignora se não puder ler, ou se não houver reader (índice novo)
+            // Ignora se não puder ler
         }
         return true;
     }
@@ -297,7 +323,19 @@ public class FileIndexer implements AutoCloseable {
 
         doc.add(new StringField("id", p.toAbsolutePath().toString(), Field.Store.YES));
         doc.add(new TextField("filename", p.getFileName().toString(), Field.Store.YES));
-        doc.add(new TextField("content", content, Field.Store.YES));
+        
+        String contentField = "content_pt"; // default
+        if (content != null && !content.trim().isEmpty() && this.languageDetector != null) {
+            try {
+                LanguageResult result = this.languageDetector.detect(content);
+                if ("en".equalsIgnoreCase(result.getLanguage())) {
+                    contentField = "content_en";
+                }
+            } catch (Exception e) {
+                // Ignore detection errors and fallback to default
+            }
+        }
+        doc.add(new TextField(contentField, content, Field.Store.YES));
         doc.add(new LongPoint("modified", lastModified));
         doc.add(new StoredField("modified", lastModified));
 
@@ -314,6 +352,9 @@ public class FileIndexer implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
+        if (readerForCheck != null) {
+            readerForCheck.close();
+        }
         if (writer != null) {
             writer.close();
         }

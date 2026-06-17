@@ -7,6 +7,7 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.*;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
@@ -18,14 +19,14 @@ import java.util.List;
 public class Filter {
 
     private Directory indexDirectory;
-    private StandardAnalyzer analyzer;
+    private org.apache.lucene.analysis.Analyzer analyzer;
     private AIutils aiUtils;
     private ObjectMapper objectMapper;
 
     public Filter() {
         // Inicializa um novo diretório na RAM para cada instância (busca nova = índice novo)
         this.indexDirectory = new ByteBuffersDirectory();
-        this.analyzer = new StandardAnalyzer();
+        this.analyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
         this.aiUtils = new AIutils();
         this.objectMapper = new ObjectMapper();
     }
@@ -36,7 +37,7 @@ public class Filter {
             java.nio.file.Files.createDirectories(path);
         }
         this.indexDirectory = org.apache.lucene.store.FSDirectory.open(path);
-        this.analyzer = new StandardAnalyzer();
+        this.analyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
         this.aiUtils = new AIutils();
         this.objectMapper = new ObjectMapper();
     }
@@ -48,7 +49,7 @@ public class Filter {
             for (int i = 0; i < nomes.size(); i++) {
                 Document doc = new Document();
                 doc.add(new TextField("filename", nomes.get(i), Field.Store.YES));
-                doc.add(new TextField("content", conteudos.get(i), Field.Store.YES));
+                doc.add(new TextField("content_pt", conteudos.get(i), Field.Store.YES));
                 writer.addDocument(doc);
             }
         }
@@ -61,12 +62,12 @@ public class Filter {
         DirectoryReader reader = DirectoryReader.open(indexDirectory);
         IndexSearcher searcher = new IndexSearcher(reader);
         
-        // Constrói uma query Boolean: (content:keyword1 OR content:keyword2 OR content:descricao...)
+        // Constrói uma query Boolean sem especificar o campo para que o MultiFieldQueryParser atue
         StringBuilder queryBuilder = new StringBuilder();
         
         // Adiciona keywords com peso alto (boost)
         for (String key : keywords) {
-            queryBuilder.append("content:").append(QueryParser.escape(key)).append("^2.0 "); 
+            queryBuilder.append(QueryParser.escape(key)).append("^2.0 "); 
         }
         
         // Adiciona palavras da descrição
@@ -77,15 +78,26 @@ public class Filter {
         String queryString = queryBuilder.toString().trim();
         if (queryString.isEmpty()) queryString = "*:*"; // Se vazio, traz tudo
 
-        QueryParser parser = new QueryParser("content", analyzer);
+        MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[]{"content_pt", "content_en", "filename"}, analyzer);
         Query query = parser.parse(queryString);
         
         TopDocs results = searcher.search(query, limite);
         
         List<DocumentoCandidato> lista = new ArrayList<>();
+        // Define uma pontuação mínima relativa (ex: 20% da maior pontuação, com um piso absoluto de 0.5)
+        float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
+        float minScoreThreshold = Math.max(0.5f, maxScore * 0.20f);
+
         for (ScoreDoc scoreDoc : results.scoreDocs) {
+            // Ignora candidatos cuja pontuação seja muito baixa
+            if (scoreDoc.score < minScoreThreshold) {
+                continue;
+            }
+
             Document doc = searcher.storedFields().document(scoreDoc.doc);
-            String conteudo = doc.get("content");
+            String conteudo = doc.get("content_pt");
+            if (conteudo == null) conteudo = doc.get("content_en");
+            if (conteudo == null) conteudo = doc.get("content"); // legacy support
             
             // Trunca conteúdo para economizar tokens na próxima etapa
             // 2000 chars é uma margem segura para chunks
@@ -110,7 +122,7 @@ public class Filter {
         StringBuilder queryBuilder = new StringBuilder();
         
         for (String key : keywords) {
-            queryBuilder.append("content:").append(QueryParser.escape(key)).append("^2.0 "); 
+            queryBuilder.append(QueryParser.escape(key)).append("^2.0 "); 
         }
         
         if (!descricao.isEmpty()) {
@@ -120,7 +132,7 @@ public class Filter {
         String queryString = queryBuilder.toString().trim();
         if (queryString.isEmpty()) queryString = "*:*";
 
-        QueryParser parser = new QueryParser("content", analyzer);
+        MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[]{"content_pt", "content_en", "filename"}, analyzer);
         Query contentQuery = parser.parse(queryString);
         mainQueryBuilder.add(contentQuery, BooleanClause.Occur.MUST);
 
@@ -147,11 +159,25 @@ public class Filter {
         TopDocs results = searcher.search(mainQueryBuilder.build(), limite);
         
         List<DocumentoCandidato> lista = new ArrayList<>();
+        // Define uma pontuação mínima relativa (ex: 20% da maior pontuação, com um piso absoluto de 0.5)
+        float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
+        float minScoreThreshold = Math.max(0.5f, maxScore * 0.20f);
+        
+        System.out.println("=== Resultados da Busca Lucene (Max Score: " + maxScore + ", Threshold: " + minScoreThreshold + ") ===");
+
         for (ScoreDoc scoreDoc : results.scoreDocs) {
             Document doc = searcher.storedFields().document(scoreDoc.doc);
-            String conteudo = doc.get("content");
-            String id = doc.get("id");
             String filename = doc.get("filename");
+            
+            // Ignora candidatos cuja pontuação seja muito baixa
+            if (scoreDoc.score >= minScoreThreshold) {
+                System.out.println("[APROVADO] Arquivo: " + filename + " | Score: " + scoreDoc.score);
+            }
+
+            String conteudo = doc.get("content_pt");
+            if (conteudo == null) conteudo = doc.get("content_en");
+            if (conteudo == null) conteudo = doc.get("content"); // legacy support
+            String id = doc.get("id");
             
             if (conteudo != null && conteudo.length() > 2000) {
                 conteudo = conteudo.substring(0, 2000) + "...";
@@ -210,7 +236,7 @@ public class Filter {
         // Serializa o lote para JSON para ficar organizado no prompt
         String jsonLote = objectMapper.writeValueAsString(lote);
 
-        return """
+        String prompt = """
             Você é um filtro de arquivos preciso.
             
             DESCRIÇÃO DO USUÁRIO: "%s"
@@ -224,6 +250,8 @@ public class Filter {
             Se nenhum for relevante neste lote, responda: []
             NÃO escreva explicações. Apenas o JSON.
             """.formatted(intencao, jsonLote);
+        
+        return prompt;
     }
 
     private List<String> processarRespostaIA(String resposta) {
