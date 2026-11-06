@@ -13,12 +13,12 @@ import javafx.application.Platform;
 import javafx.animation.Timeline;
 import javafx.animation.KeyFrame;
 import javafx.util.Duration;
-import java.util.LinkedHashMap;
 
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,7 +42,7 @@ public class FileSearchController {
     @FXML
     private Button buttonAddKeyword;
     @FXML
-    private Button buttonRemoveKeyword; // <-- novo botão para remover
+    private Button buttonRemoveKeyword;
     @FXML
     private ListView<String> listViewKeywords;
     @FXML
@@ -50,7 +50,7 @@ public class FileSearchController {
     @FXML
     private Button btnParar;
     @FXML
-    private CheckBox checkXlsx; // Adicionar no FXML
+    private CheckBox checkXlsx;
     @FXML
     private CheckBox checkPptx;
     @FXML
@@ -121,8 +121,6 @@ public class FileSearchController {
             btnParar.setDisable(true);
         }
 
-        // Inicializacao concluida sem servicos externos
-
         // Indexação inicial em background usando a pasta base padrão
         indexacaoInicio = System.currentTimeMillis();
         new Thread(() -> {
@@ -190,7 +188,7 @@ public class FileSearchController {
         // Tenta iniciar na pasta que já está escrita ou na home do usuário
         String caminhoAtual = textFieldPastaBase.getText().trim();
         caminhoAtual = caminhoAtual.replace("\\", "/");
-        if (caminhoAtual != null && !caminhoAtual.isEmpty()) {
+        if (!caminhoAtual.isEmpty()) {
             File f = new File(caminhoAtual);
             if (f.exists() && f.isDirectory()) {
                 directoryChooser.setInitialDirectory(f);
@@ -204,8 +202,6 @@ public class FileSearchController {
         File selectedDirectory = directoryChooser.showDialog(stage);
 
         if (selectedDirectory != null) {
-            // Atualiza o campo de texto com o caminho absoluto (trocando barras invertidas
-            // se necessário)
             textFieldPastaBase.setText(selectedDirectory.getAbsolutePath().replace("\\", "/"));
         }
     }
@@ -213,7 +209,6 @@ public class FileSearchController {
     @FXML
     protected void pararBusca() {
         if (tarefaBuscaAtual != null && tarefaBuscaAtual.isRunning()) {
-            // true indica que pode interromper a thread se ela estiver em execução
             tarefaBuscaAtual.cancel(true);
             listViewResultados.getItems().add("Cancelando busca... aguarde.");
             FileFinder.killPowershell();
@@ -223,7 +218,7 @@ public class FileSearchController {
     @FXML
     protected void adicionarPalavraChave() {
         if (textFieldKeyword == null)
-            return; // proteção caso FXML não tenha sido ligado
+            return;
         String palavra = textFieldKeyword.getText().trim();
         if (palavra.isEmpty()) {
             exibirAlerta("Aviso", "Digite uma palavra-chave antes de adicionar.");
@@ -235,7 +230,6 @@ public class FileSearchController {
         textFieldKeyword.clear();
     }
 
-    // NOVO: método para remover a palavra-chave selecionada
     @FXML
     protected void removerPalavraChave() {
         if (listViewKeywords == null)
@@ -282,7 +276,7 @@ public class FileSearchController {
         if (pastaBaseRaw.isEmpty()) {
             pastaBaseRaw = "C:/Users/";
         }
-        final String pastaBaseFinal = pastaBaseRaw; // Variável final para usar na Task
+        final String pastaBaseFinal = pastaBaseRaw;
 
         System.out.println("--- Iniciando Busca em Segundo Plano ---");
         System.out.println("Descrição: " + descricao);
@@ -307,7 +301,6 @@ public class FileSearchController {
                         retryTimeline = null;
                         realizarBusca();
                     } else {
-                        // Atualiza o contador enquanto aguarda
                         long el = (System.currentTimeMillis() - indexacaoInicio) / 1000;
                         int idx = arquivosIndexados.get();
                         listViewResultados.getItems().setAll(
@@ -321,14 +314,14 @@ public class FileSearchController {
                 retryTimeline.setCycleCount(Timeline.INDEFINITE);
                 retryTimeline.play();
             }
-            return; // Não inicia a task de busca ainda
+            return;
         }
 
-        // Cancela qualquer retry pendente (usuário clicou manualmente após indexar)
         if (retryTimeline != null) {
             retryTimeline.stop();
             retryTimeline = null;
         }
+
         // 3. Configura botões
         if (btnBuscar != null)
             btnBuscar.setDisable(true);
@@ -377,7 +370,6 @@ public class FileSearchController {
         };
 
         // --- Eventos da Task ---
-
         tarefaBuscaAtual.setOnSucceeded(event -> {
             listViewResultados.getItems().clear();
             LinkedHashMap<String, String> resultados = tarefaBuscaAtual.getValue();
@@ -427,12 +419,10 @@ public class FileSearchController {
             File arquivo = new File(caminhoCompleto);
 
             try {
-                // Chama o método para revelar na pasta em vez de abrir
                 fileService.revelarNoExplorer(arquivo);
-
             } catch (Exception e) {
                 exibirAlerta("Erro", "Não foi possível abrir o diretório.\nErro: " + e.getMessage());
-                e.printStackTrace(); // Log para debug
+                e.printStackTrace();
             }
         } else {
             exibirAlerta("Atenção", "Selecione um arquivo válido.");
@@ -445,34 +435,5 @@ public class FileSearchController {
         alert.setHeaderText(null);
         alert.setContentText(mensagem);
         alert.showAndWait();
-    }
-
-    // Filtra os arquivos lidos por TODAS as palavras-chave
-    private List<Integer> filterFilesbyKeyWords(String[] contents, List<String> keywords) {
-        if (keywords.isEmpty()) {
-            // Se nenhuma palavra-chave, retorna todos os índices
-            System.out.print("Adicionando todos os documentos. Índices retornados: "); // debug
-            List<Integer> allIndexes = new ArrayList<>();
-            for (int i = 0; i < contents.length; i++) {
-                allIndexes.add(i);
-                System.out.print(i + " "); // debug
-            }
-            return allIndexes;
-        }
-        List<Integer> matchedIndexes = new ArrayList<>();
-        for (int i = 0; i < contents.length; i++) {
-            String content = contents[i].toLowerCase();
-            boolean allMatch = true;
-            for (String keyword : keywords) {
-                if (!content.contains(keyword.toLowerCase())) {
-                    allMatch = false;
-                    break;
-                }
-            }
-            if (allMatch) {
-                matchedIndexes.add(i);
-            }
-        }
-        return matchedIndexes;
     }
 }

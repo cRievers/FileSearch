@@ -11,6 +11,10 @@ import java.util.Map;
 
 public class AnalyzerStrategyFactory {
 
+    private AnalyzerStrategyFactory() {
+        // Classe utilitária - previne instanciação
+    }
+
     /**
      * Analisador utilizado na etapa de indexação (FileIndexer e Filter.indexarArquivos).
      * Aplica BrazilianAnalyzer para content_pt e EnglishAnalyzer para content_en, sem expansão por sinônimos.

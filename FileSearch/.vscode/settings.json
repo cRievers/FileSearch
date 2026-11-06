@@ -1,3 +1,4 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.settings.url": "${workspaceFolder}/.settings/org.eclipse.jdt.core.prefs"
 }

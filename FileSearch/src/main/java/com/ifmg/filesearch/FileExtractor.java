@@ -36,10 +36,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.List;
 
 public class FileExtractor {
+
+    private FileExtractor() {
+        // Construtor privado para classe de utilitários estáticos
+    }
 
     private static final int MAX_TEXT_CHARS = 100 * 1024; // 100 KB por arquivo
 
@@ -317,40 +319,16 @@ public class FileExtractor {
     public static void main(String[] args) {
         System.out.println("--- Iniciando Teste do FileFinder + FileExtractor ---");
 
-        // 1. Configurar parâmetros de busca (Simulando a UI)
-        // String pastaTeste = "C:\\Users\\SEU_USUARIO\\Documents"; // <--- ALTERE AQUI
-        // PARA UMA PASTA REAL
-        // List<String> tipos = Arrays.asList(".txt", ".pdf", ".docx", ".log");
-
-        // // A descrição aqui não afeta a busca do PowerShell (ela é usada depois na
-        // IA),
-        // // mas precisamos passar para o construtor.
-        // String termoBusca = "teste";
-
-        // System.out.println("Buscando na pasta: " + pastaTeste);
-
-        // 2. Inicializar o FileFinder (configura as variáveis estáticas)
-        // new FileFinder(termoBusca, tipos, pastaTeste);
-
-        // 3. Executar a busca (PowerShell)
-        // long inicio = System.currentTimeMillis();
         String[] caminhosEncontrados = "C:\\Users\\Caio Rievers Duarte\\Pictures\\Saved Pictures\\Merge_x_Quick\\comparisions.png"
-                .split(";"); // <--- ALTERE AQUI PARA SIMULAR ARQUIVOS ENCONTRADOS
-        // long fim = System.currentTimeMillis();
-
-        // System.out.println("Busca concluída em " + (fim - inicio) + "ms");
+                .split(";");
         System.out.println("Arquivos encontrados: " + caminhosEncontrados.length);
 
-        // 4. Demonstrar a extração de texto de um arquivo específico (o "arquivo x")
         if (caminhosEncontrados.length > 0) {
-            // Pega o primeiro arquivo encontrado como exemplo
             String arquivoX = caminhosEncontrados[0];
 
             System.out.println("\n--- Demonstrando Extração do Arquivo X ---");
             System.out.println("Arquivo: " + arquivoX);
 
-            // Chama o FileExtractor (que agora usa Tika)
-            // Certifique-se de que o FileExtractor.java está atualizado com o código Tika
             String conteudo = FileExtractor.extrairTextoImagem(arquivoX);
 
             System.out.println("--> Conteúdo Extraído:");
