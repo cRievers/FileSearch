@@ -121,11 +121,7 @@ public class FileSearchController {
             btnParar.setDisable(true);
         }
 
-        // Inicia Ollama em background
-        new Thread(() -> {
-            AIutils ai = new AIutils();
-            ai.ensureOllamaServerIsRunning();
-        }).start();
+        // Inicializacao concluida sem servicos externos
 
         // Indexação inicial em background usando a pasta base padrão
         indexacaoInicio = System.currentTimeMillis();
@@ -370,46 +366,10 @@ public class FileSearchController {
                 if (isCancelled())
                     return null;
 
-                // --- Passo B: Refinamento Semântico (Ollama em Lotes) ---
-                updateMessage("Analisando contexto com IA (em lotes)...");
-                List<String> nomesAprovados;
-
-                // Mapeia nome do arquivo para caminho absoluto a partir dos candidatos
-                Map<String, String> mapNomeParaPath = new HashMap<>();
-                for (Filter.DocumentoCandidato d : candidatos) {
-                    mapNomeParaPath.put(d.filename, d.id);
-                }
-
-                if (!descricao.trim().isEmpty()) {
-                    Platform.runLater(() -> {
-                        listViewResultados.getItems().add("⏳ Processando IA em lotes... Resultados aparecerão abaixo:");
-                    });
-                    
-                    nomesAprovados = filtroService.filtrarComOllamaEmLotes(descricao, candidatos, aprovadosNoLote -> {
-                        if (aprovadosNoLote != null && !aprovadosNoLote.isEmpty()) {
-                            Platform.runLater(() -> {
-                                for (String nome : aprovadosNoLote) {
-                                    if (mapNomeParaPath.containsKey(nome) && !listViewResultados.getItems().contains(nome)) {
-                                        mapaResultados.put(nome, mapNomeParaPath.get(nome));
-                                        listViewResultados.getItems().add(nome);
-                                    }
-                                }
-                            });
-                        }
-                    });
-                } else {
-                    nomesAprovados = new ArrayList<>();
-                    for (Filter.DocumentoCandidato d : candidatos) {
-                        nomesAprovados.add(d.filename);
-                    }
-                }
-
-                // --- Passo C: Montar Resultado Final ---
+                // --- Passo B: Montar Resultado Final com Candidatos Aprovados ---
                 LinkedHashMap<String, String> resultadoFinal = new LinkedHashMap<>();
-                for (String nome : nomesAprovados) {
-                    if (mapNomeParaPath.containsKey(nome)) {
-                        resultadoFinal.put(nome, mapNomeParaPath.get(nome));
-                    }
+                for (Filter.DocumentoCandidato d : candidatos) {
+                    resultadoFinal.put(d.filename, d.id);
                 }
 
                 return resultadoFinal;

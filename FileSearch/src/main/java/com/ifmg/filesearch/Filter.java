@@ -1,50 +1,62 @@
 package com.ifmg.filesearch;
 
-import com.fasterxml.jackson.databind.ObjectMapper; // Usando Jackson pois já está no projeto (AIutils)
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * Responsável pelo gerenciamento do índice Lucene (em memória ou persistente em disco)
+ * e pela execução de consultas com ponderação BM25, expansão por sinônimos em tempo de busca
+ * e filtragem por limiar relativo de relevância.
+ */
 public class Filter {
 
-    private Directory indexDirectory;
-    private org.apache.lucene.analysis.Analyzer analyzer;
-    private AIutils aiUtils;
-    private ObjectMapper objectMapper;
+    private final Directory indexDirectory;
+    private final Analyzer indexAnalyzer;
+    private final Analyzer searchAnalyzer;
 
     public Filter() {
-        // Inicializa um novo diretório na RAM para cada instância (busca nova = índice novo)
+        // Inicializa índice em memória para operações voláteis
         this.indexDirectory = new ByteBuffersDirectory();
-        this.analyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
-        this.aiUtils = new AIutils();
-        this.objectMapper = new ObjectMapper();
+        this.indexAnalyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
+        this.searchAnalyzer = AnalyzerStrategyFactory.createSearchAnalyzer();
     }
 
     public Filter(String indexPath) throws IOException {
-        java.nio.file.Path path = java.nio.file.Paths.get(indexPath);
-        if (!java.nio.file.Files.exists(path)) {
-            java.nio.file.Files.createDirectories(path);
+        Path path = Paths.get(indexPath);
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
         }
-        this.indexDirectory = org.apache.lucene.store.FSDirectory.open(path);
-        this.analyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
-        this.aiUtils = new AIutils();
-        this.objectMapper = new ObjectMapper();
+        this.indexDirectory = FSDirectory.open(path);
+        this.indexAnalyzer = AnalyzerStrategyFactory.createMultilingualAnalyzer();
+        this.searchAnalyzer = AnalyzerStrategyFactory.createSearchAnalyzer();
     }
 
-    // 1. Indexa os arquivos encontrados pelo FileFinder
+    /**
+     * Indexa arquivos na instância em memória (utilizado em buscas dinâmicas/voláteis).
+     */
     public void indexarArquivos(List<String> nomes, List<String> conteudos) throws IOException {
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        IndexWriterConfig config = new IndexWriterConfig(indexAnalyzer);
         try (IndexWriter writer = new IndexWriter(indexDirectory, config)) {
             for (int i = 0; i < nomes.size(); i++) {
                 Document doc = new Document();
@@ -55,223 +67,152 @@ public class Filter {
         }
     }
 
-    // 2. Filtro Grosso com Lucene (Keywords + Descrição)
+    /**
+     * Busca léxica com ponderação BM25 e expansão por sinônimos na instância em memória.
+     */
     public List<DocumentoCandidato> buscarNoLucene(String descricao, List<String> keywords, int limite) throws Exception {
         if (indexDirectory.listAll().length == 0) return new ArrayList<>();
 
-        DirectoryReader reader = DirectoryReader.open(indexDirectory);
-        IndexSearcher searcher = new IndexSearcher(reader);
-        
-        // Constrói uma query Boolean sem especificar o campo para que o MultiFieldQueryParser atue
-        StringBuilder queryBuilder = new StringBuilder();
-        
-        // Adiciona keywords com peso alto (boost)
-        for (String key : keywords) {
-            queryBuilder.append(QueryParser.escape(key)).append("^2.0 "); 
-        }
-        
-        // Adiciona palavras da descrição
-        if (!descricao.isEmpty()) {
-            queryBuilder.append(QueryParser.escape(descricao));
-        }
+        try (DirectoryReader reader = DirectoryReader.open(indexDirectory)) {
+            IndexSearcher searcher = new IndexSearcher(reader);
 
-        String queryString = queryBuilder.toString().trim();
-        if (queryString.isEmpty()) queryString = "*:*"; // Se vazio, traz tudo
+            String queryString = construirQueryString(descricao, keywords);
+            if (queryString.isEmpty()) queryString = "*:*";
 
-        MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[]{"content_pt", "content_en", "filename"}, analyzer);
-        Query query = parser.parse(queryString);
-        
-        TopDocs results = searcher.search(query, limite);
-        
-        List<DocumentoCandidato> lista = new ArrayList<>();
-        // Define uma pontuação mínima relativa (ex: 20% da maior pontuação, com um piso absoluto de 0.5)
-        float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
-        float minScoreThreshold = Math.max(0.5f, maxScore * 0.20f);
+            String[] fields = new String[]{"filename", "content_pt", "content_en"};
+            Map<String, Float> boosts = new HashMap<>();
+            boosts.put("filename", 2.0f);
+            boosts.put("content_pt", 1.0f);
+            boosts.put("content_en", 1.0f);
 
-        for (ScoreDoc scoreDoc : results.scoreDocs) {
-            // Ignora candidatos cuja pontuação seja muito baixa
-            if (scoreDoc.score < minScoreThreshold) {
-                continue;
+            MultiFieldQueryParser parser = new MultiFieldQueryParser(fields, searchAnalyzer, boosts);
+            parser.setSplitOnWhitespace(false);
+            Query query = parser.parse(queryString);
+
+            TopDocs results = searcher.search(query, limite);
+
+            List<DocumentoCandidato> lista = new ArrayList<>();
+            float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
+            float minScoreThreshold = (maxScore <= 0.5f) ? (maxScore * 0.20f) : Math.max(0.5f, maxScore * 0.20f);
+
+            for (ScoreDoc scoreDoc : results.scoreDocs) {
+                if (scoreDoc.score < minScoreThreshold) {
+                    continue;
+                }
+
+                Document doc = searcher.storedFields().document(scoreDoc.doc);
+                String conteudo = doc.get("content_pt");
+                if (conteudo == null) conteudo = doc.get("content_en");
+                if (conteudo == null) conteudo = doc.get("content");
+
+                if (conteudo != null && conteudo.length() > 2000) {
+                    conteudo = conteudo.substring(0, 2000) + "...";
+                }
+
+                lista.add(new DocumentoCandidato(doc.get("filename"), conteudo));
             }
-
-            Document doc = searcher.storedFields().document(scoreDoc.doc);
-            String conteudo = doc.get("content_pt");
-            if (conteudo == null) conteudo = doc.get("content_en");
-            if (conteudo == null) conteudo = doc.get("content"); // legacy support
-            
-            // Trunca conteúdo para economizar tokens na próxima etapa
-            // 2000 chars é uma margem segura para chunks
-            if (conteudo != null && conteudo.length() > 2000) conteudo = conteudo.substring(0, 2000) + "...";
-            
-            lista.add(new DocumentoCandidato(doc.get("filename"), conteudo));
+            return lista;
         }
-        reader.close();
-        return lista;
     }
 
-    // 2b. Filtro Grosso com Lucene no Índice Persistente (Keywords + Descrição + Pasta Base + Extensões)
+    /**
+     * Busca no índice persistente aplicando filtros de caminho base, extensões de arquivo,
+     * expansão de consulta via tesauro e nota de corte relativa.
+     */
     public List<DocumentoCandidato> buscarNoLucene(String descricao, List<String> keywords, String pastaBase, List<String> tiposSelecionados, int limite) throws Exception {
         if (!DirectoryReader.indexExists(indexDirectory)) return new ArrayList<>();
 
-        DirectoryReader reader = DirectoryReader.open(indexDirectory);
-        IndexSearcher searcher = new IndexSearcher(reader);
-        
-        BooleanQuery.Builder mainQueryBuilder = new BooleanQuery.Builder();
+        try (DirectoryReader reader = DirectoryReader.open(indexDirectory)) {
+            IndexSearcher searcher = new IndexSearcher(reader);
 
-        // 1. Constrói a query de busca textual (Keywords + Descrição)
-        StringBuilder queryBuilder = new StringBuilder();
-        
-        for (String key : keywords) {
-            queryBuilder.append(QueryParser.escape(key)).append("^2.0 "); 
-        }
-        
-        if (!descricao.isEmpty()) {
-            queryBuilder.append(QueryParser.escape(descricao));
-        }
+            BooleanQuery.Builder mainQueryBuilder = new BooleanQuery.Builder();
 
-        String queryString = queryBuilder.toString().trim();
-        if (queryString.isEmpty()) queryString = "*:*";
+            // 1. Constrói a query de busca textual (Keywords + Descrição)
+            String queryString = construirQueryString(descricao, keywords);
+            if (queryString.isEmpty()) queryString = "*:*";
 
-        MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[]{"content_pt", "content_en", "filename"}, analyzer);
-        Query contentQuery = parser.parse(queryString);
-        mainQueryBuilder.add(contentQuery, BooleanClause.Occur.MUST);
+            String[] fields = new String[]{"filename", "content_pt", "content_en"};
+            Map<String, Float> boosts = new HashMap<>();
+            boosts.put("filename", 2.0f);
+            boosts.put("content_pt", 1.0f);
+            boosts.put("content_en", 1.0f);
 
-        // 2. Filtro por Pasta Base (PrefixQuery no campo id)
-        if (pastaBase != null && !pastaBase.isEmpty()) {
-            String normalizedBasePath = java.nio.file.Paths.get(pastaBase).toAbsolutePath().toString();
-            if (!normalizedBasePath.endsWith(java.io.File.separator)) {
-                normalizedBasePath += java.io.File.separator;
-            }
-            PrefixQuery pathQuery = new PrefixQuery(new Term("id", normalizedBasePath));
-            mainQueryBuilder.add(pathQuery, BooleanClause.Occur.MUST);
-        }
+            MultiFieldQueryParser parser = new MultiFieldQueryParser(fields, searchAnalyzer, boosts);
+            parser.setSplitOnWhitespace(false);
+            Query contentQuery = parser.parse(queryString);
+            mainQueryBuilder.add(contentQuery, BooleanClause.Occur.MUST);
 
-        // 3. Filtro por extensões
-        if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
-            BooleanQuery.Builder extQueryBuilder = new BooleanQuery.Builder();
-            for (String ext : tiposSelecionados) {
-                String extClean = ext.startsWith(".") ? ext.substring(1) : ext;
-                extQueryBuilder.add(new TermQuery(new Term("extension", extClean.toLowerCase())), BooleanClause.Occur.SHOULD);
-            }
-            mainQueryBuilder.add(extQueryBuilder.build(), BooleanClause.Occur.MUST);
-        }
-        
-        TopDocs results = searcher.search(mainQueryBuilder.build(), limite);
-        
-        List<DocumentoCandidato> lista = new ArrayList<>();
-        // Define uma pontuação mínima relativa (ex: 20% da maior pontuação, com um piso absoluto de 0.5)
-        float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
-        float minScoreThreshold = Math.max(0.5f, maxScore * 0.20f);
-        
-        System.out.println("=== Resultados da Busca Lucene (Max Score: " + maxScore + ", Threshold: " + minScoreThreshold + ") ===");
-
-        for (ScoreDoc scoreDoc : results.scoreDocs) {
-            Document doc = searcher.storedFields().document(scoreDoc.doc);
-            String filename = doc.get("filename");
-            
-            // Ignora candidatos cuja pontuação seja muito baixa
-            if (scoreDoc.score >= minScoreThreshold) {
-                System.out.println("[APROVADO] Arquivo: " + filename + " | Score: " + scoreDoc.score);
-            }
-
-            String conteudo = doc.get("content_pt");
-            if (conteudo == null) conteudo = doc.get("content_en");
-            if (conteudo == null) conteudo = doc.get("content"); // legacy support
-            String id = doc.get("id");
-            
-            if (conteudo != null && conteudo.length() > 2000) {
-                conteudo = conteudo.substring(0, 2000) + "...";
-            }
-            
-            lista.add(new DocumentoCandidato(id, filename, conteudo));
-        }
-        reader.close();
-        return lista;
-    }
-
-    // 3. Filtro Fino com Ollama EM LOTES
-    public List<String> filtrarComOllamaEmLotes(String intencaoUsuario, List<DocumentoCandidato> candidatos, java.util.function.Consumer<List<String>> onBatchProcessed) {
-        List<String> arquivosFinais = new ArrayList<>();
-        
-        // Configuração do Lote
-        int tamanhoLote = 5; // Envia 5 arquivos por vez para a IA
-        
-        for (int i = 0; i < candidatos.size(); i += tamanhoLote) {
-            // Cria o subgrupo (batch)
-            int fim = Math.min(i + tamanhoLote, candidatos.size());
-            List<DocumentoCandidato> lote = candidatos.subList(i, fim);
-            
-            System.out.println("Processando lote de IA: " + i + " até " + fim);
-            
-            try {
-                // Monta o prompt para este lote específico
-                String prompt = montarPromptLote(intencaoUsuario, lote);
-                
-                // Chama o Ollama (reutilizando sua classe AIutils)
-                String respostaJson = aiUtils.generate(prompt);
-                
-                // Processa a resposta do lote
-                List<String> aprovadosNoLote = processarRespostaIA(respostaJson);
-                arquivosFinais.addAll(aprovadosNoLote);
-                
-                // Retorna os resultados à medida em que são processados
-                if (onBatchProcessed != null) {
-                    onBatchProcessed.accept(aprovadosNoLote);
+            // 2. Filtro por Pasta Base (PrefixQuery no campo id)
+            if (pastaBase != null && !pastaBase.isEmpty()) {
+                String normalizedBasePath = Paths.get(pastaBase).toAbsolutePath().toString();
+                if (!normalizedBasePath.endsWith(java.io.File.separator)) {
+                    normalizedBasePath += java.io.File.separator;
                 }
-                
-            } catch (Exception e) {
-                System.err.println("Erro ao processar lote " + i + ": " + e.getMessage());
+                PrefixQuery pathQuery = new PrefixQuery(new Term("id", normalizedBasePath));
+                mainQueryBuilder.add(pathQuery, BooleanClause.Occur.MUST);
+            }
+
+            // 3. Filtro por extensões
+            if (tiposSelecionados != null && !tiposSelecionados.isEmpty()) {
+                BooleanQuery.Builder extQueryBuilder = new BooleanQuery.Builder();
+                for (String ext : tiposSelecionados) {
+                    String extClean = ext.startsWith(".") ? ext.substring(1) : ext;
+                    extQueryBuilder.add(new TermQuery(new Term("extension", extClean.toLowerCase())), BooleanClause.Occur.SHOULD);
+                }
+                mainQueryBuilder.add(extQueryBuilder.build(), BooleanClause.Occur.MUST);
+            }
+
+            TopDocs results = searcher.search(mainQueryBuilder.build(), limite);
+
+            List<DocumentoCandidato> lista = new ArrayList<>();
+            float maxScore = results.scoreDocs.length > 0 ? results.scoreDocs[0].score : 0;
+            float minScoreThreshold = (maxScore <= 0.5f) ? (maxScore * 0.20f) : Math.max(0.5f, maxScore * 0.20f);
+
+            System.out.println("=== Resultados da Busca Lucene (Max Score: " + maxScore + ", Threshold: " + minScoreThreshold + ") ===");
+
+            for (ScoreDoc scoreDoc : results.scoreDocs) {
+                // Descarta candidatos abaixo do limiar relativo (Threshold = max(0.5, ScoreMax * 0.20))
+                if (scoreDoc.score < minScoreThreshold) {
+                    continue;
+                }
+
+                Document doc = searcher.storedFields().document(scoreDoc.doc);
+                String filename = doc.get("filename");
+                String id = doc.get("id");
+                String conteudo = doc.get("content_pt");
+                if (conteudo == null) conteudo = doc.get("content_en");
+                if (conteudo == null) conteudo = doc.get("content");
+
+                System.out.println("[APROVADO] Arquivo: " + filename + " | Score: " + scoreDoc.score);
+
+                if (conteudo != null && conteudo.length() > 2000) {
+                    conteudo = conteudo.substring(0, 2000) + "...";
+                }
+
+                lista.add(new DocumentoCandidato(id, filename, conteudo));
+            }
+            return lista;
+        }
+    }
+
+    private String construirQueryString(String descricao, List<String> keywords) {
+        StringBuilder queryBuilder = new StringBuilder();
+
+        if (keywords != null) {
+            for (String key : keywords) {
+                if (key != null && !key.trim().isEmpty()) {
+                    queryBuilder.append(QueryParser.escape(key.trim())).append("^2.0 ");
+                }
             }
         }
-        
-        return arquivosFinais;
-    }
 
-    // Sobrecarga para retrocompatibilidade
-    public List<String> filtrarComOllamaEmLotes(String intencaoUsuario, List<DocumentoCandidato> candidatos) {
-        return filtrarComOllamaEmLotes(intencaoUsuario, candidatos, null);
-    }
-
-    private String montarPromptLote(String intencao, List<DocumentoCandidato> lote) throws Exception {
-        // Serializa o lote para JSON para ficar organizado no prompt
-        String jsonLote = objectMapper.writeValueAsString(lote);
-
-        String prompt = """
-            Você é um filtro de arquivos preciso.
-            
-            DESCRIÇÃO DO USUÁRIO: "%s"
-            
-            Analise os seguintes arquivos candidatos (fornecidos em JSON):
-            %s
-            
-            Quais destes arquivos são SEMANTICAMENTE relevantes para a descrição do usuário?
-            Responda APENAS um JSON Array de Strings com o ranking dos nomes exatos ("filename") dos arquivos aprovados.
-            Exemplo de resposta: ["relatorio.pdf", "notas.txt"]
-            Se nenhum for relevante neste lote, responda: []
-            NÃO escreva explicações. Apenas o JSON.
-            """.formatted(intencao, jsonLote);
-        
-        return prompt;
-    }
-
-    private List<String> processarRespostaIA(String resposta) {
-        List<String> nomes = new ArrayList<>();
-        try {
-            // Limpeza básica caso o modelo seja "verboso" (markdown blocks)
-            String jsonLimpo = resposta.replace("```json", "").replace("```", "").trim();
-            
-            // O Jackson lê o array de strings
-            List<?> lista = objectMapper.readValue(jsonLimpo, List.class);
-            for (Object item : lista) {
-                nomes.add(item.toString());
-            }
-        } catch (Exception e) {
-            System.err.println("Falha ao parsear resposta da IA: " + resposta);
+        if (descricao != null && !descricao.trim().isEmpty()) {
+            queryBuilder.append(QueryParser.escape(descricao.trim()));
         }
-        return nomes;
+
+        return queryBuilder.toString().trim();
     }
 
-    // Classe auxiliar interna
     public static class DocumentoCandidato {
         public String id;
         public String filename;

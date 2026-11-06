@@ -1,0 +1,247 @@
+# Dicionario de Sinonimos em Portugues (Dominio Juridico e Administrativo)
+# Formato compativel com Apache Lucene SynonymGraphFilter (Solr format)
+# Mapeamentos bidirecionais (equivalencia semantica direta)
+
+# Juridico - Contratos e Obrigacoes
+aluguel, locacao, arrendamento
+rescisao, distrato, resilicao, resolucao
+inadimplemento, descumprimento, mora, inadimplencia
+contrato, instrumento, avenca, pacto
+procuracao, mandato, instrumento de mandato
+distrato, resilição, dissolução contratual
+
+# Juridico - Processual e Tutelas
+liminar, tutela, antecipacao de tutela, provimento de urgencia
+honorarios, remuneracao, verba honoraria, honorarios sucumbenciais
+penhora, constricao, arresto, bloqueio judicial
+citacao, intimacao, notificacao
+reu, demandado, executado, devedor
+autor, demandante, exequente, credor
+sentenca, acordao, decisao, julgado
+recurso, apelo, agravo, embargos
+
+# Juridico - Trabalhista e Previdenciario
+demissao, dispensa, rescisao trabalhista, desligamento
+salario, remuneracao, vencimento, proventos, estipendio
+acordo, convencao, transacao, conciliacao
+
+# Administrativo e Organizacional
+empresa, companhia, sociedade, firma, organizacao
+funcionario, empregado, colaborador, trabalhador
+comprovante, recibo, comprovacao, declaracao
+pagamento, quitacao, liquidacao, adimplemento
+aditivo, termo aditivo, aditamento
+indenizacao, ressarcimento, reparacao, compensacao
+certidao, certidão, atestado, certidão negativa
+licitacao, certame, pregao, concorrencia
+multa, sancao, penalidade
+custas, despesas processuais, emolumentos
+documento, certidão, certidão negativa, comprovante
+prazo, tempestividade, termo, vencimento
+peticao, requerimento, peca, peticao inicial
+contestacao, defesa, impugnacao
+execucao, cumprimento de sentenca, cobranca judicial
+audiencia, assentada, sessao
+agravo, recurso de agravo, agravo de instrumento
+alvara, mandado de levantamento, autorizacao judicial
+imposto, tributo, taxa, contribuicao
+isencao, imunidade, desoneracao
+vigencia, validade, vigencia contratual, prazo de vigencia
+testemunha, depoente, informante
+pericia, laudo, exame pericial, laudo pericial
+falencia, recuperacao judicial, concordata
+posse, detencao, esbulho, turbacao
+propriedade, dominio, titularidade
+testamento, sucessao, heranca, inventario
+partilha, divisao, meacao
+doacao, cessao, transferencia, alienacao
+compra e venda, alienacao, aquisicao
+notificacao extrajudicial, notificacao, interpelacao
+notario, tabeliao, cartorio, serventia
+procurador, advogado, patrono, causidico
+jurisprudencia, precedentes, sumula
+processo, autos, procedimento, feito
+vara, juizo, comarca, tribunal
+competencia, jurisdicao, foro
+revelia, contumacia, desatendimento
+decadencia, prescricao, extincao
+nulidade, invalidade, anulabilidade, vicio
+fiador, garantidor, avalista, fiador solidario
+caucao, garantia, fianca, deposito
+sinistro, evento danoso, sinistro indenizavel
+apolice, contrato de seguro, premio de seguro
+beneficiario, segurado, terceiro prejudicado
+sigilo, confidencialidade, reserva, privacidade
+dados pessoais, titular de dados, informacoes pessoais
+tratamento de dados, operacao de tratamento, processamento de dados
+consentimento, autorizacao, anuencia
+vazamento, incidente de seguranca, violacao de dados
+controlador, operador, encarregado de dados
+compliance, conformidade, adequacao normativa
+auditoria, inspecao, verificacao, fiscalizacao
+protocolo, registro, autuacao
+despacho, ato ordinatorio, pronunciamento
+parecer, opinativo, manifestacao tecnica
+revel, inadimplente, devedor contumaz
+infracao, desvio, desconformidade
+revogacao, anulacao, cassacao, extincao do ato
+termo de posse, assuncao, investidura
+nomeacao, designacao, lotacao
+estatuto, regimento, regulamento, diretriz
+atos constitutivos, contrato social, estatuto social
+prolabore, retirada pro labore, remuneração de sócio
+dividendo, distribuicao de lucros, rendimento
+capital social, participacao societaria, cotas
+assembleia, reuniao de socios, sessao plenaria
+ata, registro de reuniao, termo de deliberacao
+balanco, demonstrativo contabil, demonstracoes financeiras
+receita, faturamento, arrecadacao
+faturamento, receita bruta, faturamento anual
+tributacao, recolhimento, apuracao fiscal
+darf, guia de recolhimento, documento de arrecadacao
+inss, previdencia, contribuicao previdenciaria
+fgts, fundo de garantia, deposito do fgts
+declaracao de imposto, demonstrativo fiscal, declaracao anual
+guia, boleto, carne de pagamento
+quirografario, credor quirografario, credor comum
+privilegiado, credito privilegiado, credito preferencial
+hipoteca, gravame, onus real
+alienacao fiduciaria, garantia fiduciaria, alienacao
+gravame, restricao, impedimento
+baixa, cancelamento, levantamento
+averbacao, registro imobiliario, inscricao
+matricula, certidao de matricula, registro do imovel
+escritura, escritura publica, instrumento publico
+termo de compromisso, acordo de conduta, termo de ajustamento
+ajustamento de conduta, tac, termo de ajustamento
+notificacao previa, aviso previo, comunicacao previa
+indenizacao rescisoria, verbas rescisorias, rescisorias
+aviso previo, aviso-previo, comunicacao de dispensa
+ferias, descanso remunerado, ferias proporcionais
+decimo terceiro, gratificacao natalina, 13o salario
+banco de horas, compensacao de jornada, horas extras
+adicional noturno, jornada noturna, trabalho noturno
+insalubridade, adicional de insalubridade, atividade insalubre
+periculosidade, adicional de periculosidade, risco acentuado
+assédio, assédio moral, assedio
+estabilidade, garantia de emprego, estabilidade provisoria
+acidente de trabalho, doenca ocupacional, nexo causal
+cat, comunicacao de acidente de trabalho, registro de acidente
+laudo ergonômico, ergonomia, avaliacao ergonomica
+ltcat, laudo tecnico de condicoes ambientais, condicoes ambientais
+pgr, programa de gerenciamento de riscos, gestao de riscos
+pcmso, controle medico de saude ocupacional, saude ocupacional
+aso, atestado de saude ocupacional, exame medico
+inaptidao, aptidao, apto para o trabalho
+afastamento, licenca medica, auxilio por incapacidade
+auxilio doenca, auxilio-doenca, beneficio por incapacidade
+aposentadoria por invalidez, incapacidade permanente, aposentadoria
+perito judicial, perito do juizo, perito oficial
+assistente tecnico, perito assistente, indicado da parte
+quesitos, perguntas periciais, formulacao de quesitos
+laudo pericial, parecer tecnico pericial, conclusao pericial
+impugnacao ao laudo, divergencia pericial, manifestacao sobre pericia
+esclarecimentos, complementacao do laudo, respostas do perito
+honorarios periciais, custas da pericia, remuneracao do perito
+saldo de salario, dias trabalhados, pagamento proporcional
+seguro desemprego, habilitacao ao seguro, guias de seguro desemprego
+carteira de trabalho, ctps, carteira profissional
+registro em carteira, anotacao na ctps, vinculo empregaticio
+vinculo empregaticio, relacao de emprego, vinculo de trabalho
+pejotizacao, terceirizacao fraudulenta, falsa pj
+terceirizacao, prestacao de servicos, tomada de servicos
+responsabilidade subsidiaria, devedor subsidiario, tomador de servicos
+responsabilidade solidaria, coobrigado, devedor solidario
+grupo economico, empresas coligadas, conglomerado
+desconsideracao da personalidade juridica, desconsideracao, idpj
+fraude a execucao, blindagem patrimonial, ocultacao de bens
+bens penhoraveis, ativos financeiros, patrimonio do devedor
+sisbajud, penhora online, bloqueio bacen
+renajud, restricao de veiculo, bloqueio renajud
+serasajud, negativacao judicial, inscricao em cadastros
+infojud, pesquisa fiscal, declaracoes a receita
+quebra de sigilo, afastamento de sigilo, requisicao judicial
+expedicao de oficio, oficio judicial, solicitacao de informacoes
+mandado, ordem judicial, mandado de cumprimento
+oficial de justica, meirinho, servidor cumpridor
+cumprimento de mandado, certidao do oficial, diligencia cumprida
+auto de penhora, termo de penhora, certidao de constricao
+avaliacao do bem, laudo de avaliacao, valor de mercado
+leilao, praca, hasta publica, alienacao judicial
+leiloeiro, pregoeiro, leiloeiro oficial
+arrematacao, lance vencedor, adjudicacao
+adjudicacao, tomada do bem, expropriacao direta
+auto de arrematacao, carta de arrematacao, termo de praceamento
+remicao, pagamento da divida, resgate do bem
+embargos a execucao, defesa do devedor, oposicao a execucao
+impugnacao ao cumprimento, excecao de pre-executividade, objecao
+embargos de terceiro, defesa de terceiro, protecao de posse de terceiro
+fraude contra credores, acao pauliana, desvio de patrimonio
+insolvencia, insolvencia civil, iliquidez
+credito trabalhista, verba alimentar, privilegio creditório
+superprivilegio, credito alimentar superprivilegiado, prioridade legal
+ordem de preferencia, concurso de credores, classificacao de creditos
+edital, publicacao em edital, citacao por edital
+diario da justica, dje, diario oficial
+publicacao, intimacao no dje, divulgacao em diario
+transito em julgado, definitividade, decisao definitiva, coisa julgada
+coisa julgada, eficacia preclusiva, imutabilidade da sentenca
+acao rescisoria, desconstituicao de julgado, pedido de rescisao
+prazo recursal, contagem de prazo, dias uteis
+preclusao, perda da faculdade processual, decurso de prazo
+intempestividade, recurso fora do prazo, perda do prazo
+revel, revelia declarada, ausencia de contestacao
+confissao ficta, presuncao de veracidade, pena de confissao
+onus da prova, encargo probatorio, dever de provar
+inversao do onus, distribuicao dinamica, inversao da prova
+hipossuficiencia, vulnerabilidade, debilidade tecnica
+relacao de consumo, consumidor e fornecedor, vinculo consumerista
+cdc, codigo de defesa do consumidor, lei 8078
+vicio oculto, defeito de fabricacao, vicio redibitorio
+fato do produto, acidente de consumo, dano ao consumidor
+recall, chamamento, convocacao para reparo
+dano moral, abalo moral, lesao a honra, sofrimento
+dano material, prejuizo financeiro, perda patrimonial
+danos emergentes, perdas diretas, prejuizo imediato
+lucros cessantes, o que razoavelmente deixou de lucrar, ganhos frustrados
+perda de uma chance, chance perdida, expectativa frustrada
+quantum indenizatorio, valor da indenizacao, montante reparatorio
+reparacao integral, principio da reparacao plena, recomposicao
+enriquecimento sem causa, enriquecimento ilicito, proveito indevido
+repeticao de indebito, devolucao em dobro, cobranca indevida
+devolucao simples, restituicao de valores, reembolso simples
+bloqueio cautelar, indisponibilidade, congelamento de bens
+sequestro de bens, apreensao judicial, retencao de ativos
+busca e apreensao, mandado de apreensao, recuperacao da posse
+reintegracao de posse, interdito proibitorio, manutencao de posse
+usucapiao, prescricao aquisitiva, posse prolongada
+posse mansa e pacifica, posse continuada, posse ininterrupta
+animus domini, intencao de dono, posse qualificada
+justo titulo, boa fe, presuncao de posse legitima
+condominio, copropriedade, comunhao de bens
+fracao ideal, quota-parte, percentual de dominio
+convencao de condominio, regulamento interno, regimento interno
+despesas condominiais, cota condominial, taxa de condominio
+inadimplencia condominial, taxa condominial atrasada, debito condominial
+locador, proprietario locador, senhorio
+locatario, inquilino, arrendatario
+sublocacao, cessao de locacao, emprestimo do imovel
+despejo, acao de despejo, desocupacao do imovel
+denuncia vazia, retomada sem motivacao, despejo imotivado
+denuncia motivada, rescisao por infracao, despejo motivado
+revisional de aluguel, revisao de aluguel, ajuste do valor locaticio
+acao renovatoria, renovacao compulsoria, renovacao da locacao comercial
+ponto comercial, fundo de comercio, aviamento
+luvas, direito de ponto, cobranca inicial na locacao comercial
+fiador na locacao, garantia fidejussoria, fiador do contrato
+seguro fianca, garantia por apolice, seguro locaticio
+deposito caucao, caucao em dinheiro, garantia em poupanca
+direito de preferencia, prioridade de compra, opcao de aquisicao
+benfeitorias necessarias, reparos essenciais, obras de conservacao
+benfeitorias uteis, melhorias, obras de aperfeicoamento
+benfeitorias voluptuarias, obras de embelezamento, melhorias recreativas
+direito de retencao, retencao por benfeitorias, posse ate indenizacao
+vistorias de imovel, vistoria de entrada, vistoria de saida, laudo de vistoria
+termo de entrega de chaves, devolucao do imovel, rescisao de locacao
+recibo de entrega de chaves, comprovante de devolucao, encerramento da posse
+
