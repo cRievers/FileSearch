@@ -80,6 +80,21 @@ public class FileSearchController {
             }
         });
 
+        // Configura quebra de linha para exibição de snippets
+        listViewResultados.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    setText(item);
+                    setWrapText(true);
+                }
+            }
+        });
+
         // Inicializa a ListView de palavras-chave e configura o botão/enter
         if (listViewKeywords != null) {
             listViewKeywords.setItems(palavrasChave);
@@ -362,7 +377,13 @@ public class FileSearchController {
                 // --- Passo B: Montar Resultado Final com Candidatos Aprovados ---
                 LinkedHashMap<String, String> resultadoFinal = new LinkedHashMap<>();
                 for (Filter.DocumentoCandidato d : candidatos) {
-                    resultadoFinal.put(d.filename, d.id);
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("📄 ").append(d.filename);
+                    if (d.snippet != null && !d.snippet.trim().isEmpty()) {
+                        sb.append("\n   💡 Snippet: ").append(d.snippet.trim());
+                    }
+                    sb.append("\n   📂 ").append(d.id);
+                    resultadoFinal.put(sb.toString(), d.id);
                 }
 
                 return resultadoFinal;

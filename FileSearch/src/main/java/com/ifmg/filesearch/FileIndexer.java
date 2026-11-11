@@ -6,6 +6,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
@@ -346,6 +347,17 @@ public class FileIndexer implements AutoCloseable {
             extension = filename.substring(i + 1).toLowerCase();
         }
         doc.add(new StringField("extension", extension, Field.Store.YES));
+
+        // Indexação vetorial densa (HNSW) via EmbeddingService
+        try {
+            String textToEmbed = (content != null && !content.trim().isEmpty())
+                    ? content
+                    : p.getFileName().toString();
+            float[] embedding = EmbeddingService.getInstance().encode(textToEmbed);
+            doc.add(new KnnFloatVectorField("content_vec", embedding, VectorSimilarityFunction.COSINE));
+        } catch (Exception e) {
+            System.err.println("[Indexer] Falha ao gerar embedding para " + p.getFileName() + ": " + e.getMessage());
+        }
 
         return doc;
     }
